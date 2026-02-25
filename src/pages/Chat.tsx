@@ -1,7 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import ChatPanel from "@/components/chat/ChatPanel";
+import ActivityPanel from "@/components/chat/ActivityPanel";
 
 const Chat = () => {
   const [activeTab, setActiveTab] = useState<"chat" | "activity">("chat");
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+  const sendMessageRef = useRef<((msg: string) => void) | null>(null);
+
+  useEffect(() => {
+    const prompt = searchParams.get("prompt");
+    if (prompt) {
+      setPendingPrompt(prompt);
+    }
+  }, [searchParams]);
+
+  const handleQuickAction = useCallback((message: string) => {
+    setActiveTab("chat");
+    if (sendMessageRef.current) {
+      sendMessageRef.current(message);
+    } else {
+      setPendingPrompt(message);
+    }
+  }, []);
 
   return (
     <div className="flex h-full flex-col md:flex-row">
@@ -31,46 +55,24 @@ const Chat = () => {
 
       {/* Chat panel */}
       <div
-        className={`flex-1 flex flex-col md:w-[58%] md:max-w-[58%] ${
+        className={`flex-1 flex flex-col md:w-[58%] md:max-w-[58%] min-h-0 ${
           activeTab !== "chat" ? "hidden md:flex" : "flex"
         }`}
       >
-        <div className="border-b border-border px-5 py-4">
-          <h1 className="text-sm font-semibold text-foreground">Chat</h1>
-        </div>
-
-        {/* Messages area */}
-        <div className="flex-1 overflow-y-auto px-5 py-6">
-          <p className="text-sm text-muted-foreground">No messages yet</p>
-        </div>
-
-        {/* Input bar */}
-        <div className="border-t border-border px-5 py-3">
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Type a message…"
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-            />
-            <button className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90">
-              Send
-            </button>
-          </div>
-        </div>
+        <ChatPanel
+          pendingPrompt={pendingPrompt}
+          onPromptConsumed={() => setPendingPrompt(null)}
+          sendMessageRef={sendMessageRef}
+        />
       </div>
 
       {/* Activity panel */}
       <div
-        className={`md:w-[42%] md:max-w-[42%] border-l border-border flex flex-col ${
+        className={`md:w-[42%] md:max-w-[42%] border-l border-border flex flex-col min-h-0 ${
           activeTab !== "activity" ? "hidden md:flex" : "flex"
         }`}
       >
-        <div className="border-b border-border px-5 py-4">
-          <h1 className="text-sm font-semibold text-foreground">Activity</h1>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 py-6">
-          <p className="text-sm text-muted-foreground">No recent activity</p>
-        </div>
+        <ActivityPanel onQuickAction={handleQuickAction} />
       </div>
     </div>
   );
