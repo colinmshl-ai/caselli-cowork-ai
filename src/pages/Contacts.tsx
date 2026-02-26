@@ -210,7 +210,7 @@ const Contacts = () => {
                 <button
                   key={c.id}
                   onClick={() => openEdit(c)}
-                  className="w-full border-b border-border px-5 py-3.5 text-left transition-colors hover:bg-secondary/50 min-h-[44px]"
+                  className="w-full border-b border-border px-5 py-3.5 text-left transition-all duration-200 hover:bg-secondary/50 min-h-[44px]"
                 >
                   {/* Mobile card layout */}
                   <div className="md:hidden">

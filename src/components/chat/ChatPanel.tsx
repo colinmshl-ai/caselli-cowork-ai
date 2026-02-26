@@ -21,6 +21,7 @@ interface ChatPanelProps {
   onPromptConsumed: () => void;
   sendMessageRef: MutableRefObject<((msg: string) => void) | null>;
   onConversationContext?: (ctx: ConversationContext) => void;
+  textareaRef?: MutableRefObject<HTMLTextAreaElement | null>;
 }
 
 const TypingIndicator = ({ status, completedTools }: { status: string; completedTools: string[] }) => (
@@ -92,7 +93,7 @@ function parseSSEBuffer(buffer: string): [{ event: string; data: string }[], str
   return [events, remaining];
 }
 
-const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext }: ChatPanelProps) => {
+const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext, textareaRef: externalTextareaRef }: ChatPanelProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeConvoId, setActiveConvoId] = useState<string | null>(null);
@@ -102,7 +103,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const [showConvos, setShowConvos] = useState(false);
   const [convoSearch, setConvoSearch] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = externalTextareaRef || internalTextareaRef;
   const initialized = useRef(false);
   const welcomeSent = useRef(false);
   const [completedTools, setCompletedTools] = useState<string[]>([]);
@@ -696,7 +698,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       )}
 
       {/* Input */}
-      <div className="sticky bottom-0 z-10 bg-background px-4 py-3 pb-safe border-t border-border">
+      <div className="sticky bottom-0 z-10 bg-background px-4 py-3 border-t border-border">
         <div className="flex items-end gap-2 rounded-2xl border border-transparent bg-secondary/50 px-5 py-3 transition-all focus-within:border-border focus-within:bg-card">
           <textarea
             ref={textareaRef}
@@ -710,7 +712,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim()}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center transition-colors ${input.trim() ? "text-primary" : "text-muted-foreground"}`}
+            className={`flex h-9 w-9 min-w-[44px] min-h-[44px] shrink-0 items-center justify-center transition-all duration-200 ${input.trim() ? "text-primary" : "text-muted-foreground"}`}
+            aria-label="Send message"
           >
             <ArrowUp size={20} />
           </button>
