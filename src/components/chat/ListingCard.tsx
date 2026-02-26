@@ -9,7 +9,7 @@ interface ListingCardProps {
 }
 
 const ListingCard = ({ address, stats, description, onAction }: ListingCardProps) => (
-  <div className="border border-border rounded-md overflow-hidden bg-background mt-3">
+  <div className="border border-border rounded-md overflow-hidden bg-background mt-3 animate-fade-in-up">
     <div className="px-4 py-3 border-b border-border">
       <div className="text-sm font-medium text-foreground">{address}</div>
       {stats && (

@@ -6,6 +6,7 @@ import { Plus, ArrowUp, ChevronDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import ContentCardRenderer from "./ContentCardRenderer";
 import CopyButton from "./CopyButton";
+import EntityLinker from "./EntityLinker";
 import type { ConversationContext } from "@/pages/Chat";
 
 const DEAL_TOOLS = ["get_active_deals", "get_deal_details", "update_deal", "check_upcoming_deadlines", "create_deal"];
@@ -20,16 +21,23 @@ interface ChatPanelProps {
 }
 
 const TypingIndicator = ({ status, completedTools }: { status: string; completedTools: string[] }) => (
-  <div className="flex flex-col gap-1 px-2 py-1">
+  <div className="flex flex-wrap gap-1.5 px-2 py-1">
     {completedTools.map((tool, i) => (
-      <span key={i} className="text-xs text-muted-foreground flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
+      <span
+        key={i}
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-accent text-accent-foreground animate-fade-in"
+      >
+        <span className="text-primary">✓</span>
         {tool}
       </span>
     ))}
     {status && (
-      <span className="text-sm text-muted-foreground animate-pulse flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse shrink-0" />
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-primary/10 text-primary">
+        <span className="flex gap-0.5">
+          <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "0ms" }} />
+          <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "200ms" }} />
+          <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "400ms" }} />
+        </span>
         {status}
       </span>
     )}
@@ -293,6 +301,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         let sseBuffer = "";
         const streamingContentRef = { current: "" };
         let toolsUsed: { tool: string; description: string }[] = [];
+        let lastDealIdFromDone: string | undefined;
+        let lastContactIdFromDone: string | undefined;
         let errorSeen = false;
         let updateScheduled = false;
 
@@ -338,10 +348,12 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 const parsed = JSON.parse(evt.data);
                 toolsUsed = parsed.tools_used || [];
                 // Capture entity IDs from done event
-                if (parsed.last_deal_id || parsed.last_contact_id) {
+                lastDealIdFromDone = parsed.last_deal_id || undefined;
+                lastContactIdFromDone = parsed.last_contact_id || undefined;
+                if (lastDealIdFromDone || lastContactIdFromDone) {
                   const ctx = parseConversationContext(toolsUsed);
-                  ctx.lastDealId = parsed.last_deal_id || undefined;
-                  ctx.lastContactId = parsed.last_contact_id || undefined;
+                  ctx.lastDealId = lastDealIdFromDone;
+                  ctx.lastContactId = lastContactIdFromDone;
                   onConversationContext?.(ctx);
                 }
                 break;
@@ -359,8 +371,12 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         // Final content update
         const finalContent = streamingContentRef.current || (errorSeen ? "Something went wrong. Please try again." : "I wasn't able to generate a response.");
+        const entityIds = {
+          lastDealId: lastDealIdFromDone,
+          lastContactId: lastContactIdFromDone,
+        };
         setMessages((prev) =>
-          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent } : m))
+          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, ...entityIds } : m))
         );
 
         // Fetch the saved message from DB to get the real ID
@@ -540,7 +556,9 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
             >
               {m.role === "assistant" ? (
                 <>
-                  <ContentCardRenderer content={m.content} onAction={sendMessage} />
+                  <EntityLinker dealId={m.lastDealId} contactId={m.lastContactId}>
+                    <ContentCardRenderer content={m.content} onAction={sendMessage} />
+                  </EntityLinker>
                   <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <CopyButton text={m.content} />
                   </div>
