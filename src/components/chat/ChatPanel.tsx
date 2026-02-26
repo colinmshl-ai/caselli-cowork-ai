@@ -19,14 +19,20 @@ interface ChatPanelProps {
   onConversationContext?: (ctx: ConversationContext) => void;
 }
 
-const TypingIndicator = ({ status }: { status: string }) => (
-  <div className="flex items-center gap-2 px-2 py-1 animate-fade-in">
-    <span className="flex items-center gap-1">
-      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-typing-dot" style={{ animationDelay: "0ms" }} />
-      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-typing-dot" style={{ animationDelay: "200ms" }} />
-      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-typing-dot" style={{ animationDelay: "400ms" }} />
-    </span>
-    <span className="text-sm text-muted-foreground">{status}</span>
+const TypingIndicator = ({ status, completedTools }: { status: string; completedTools: string[] }) => (
+  <div className="flex flex-col gap-1 px-2 py-1">
+    {completedTools.map((tool, i) => (
+      <span key={i} className="text-xs text-muted-foreground flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
+        {tool}
+      </span>
+    ))}
+    {status && (
+      <span className="text-sm text-muted-foreground animate-pulse flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse shrink-0" />
+        {status}
+      </span>
+    )}
   </div>
 );
 
@@ -90,6 +96,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialized = useRef(false);
   const welcomeSent = useRef(false);
+  const [completedTools, setCompletedTools] = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Mobile keyboard handling via visualViewport
@@ -264,7 +271,12 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
               }
               case "tool_status": {
                 const parsed = JSON.parse(evt.data);
-                setTypingStatus(parsed.status);
+                setTypingStatus((prev) => {
+                  if (prev && prev !== "Thinking...") {
+                    setCompletedTools((ct) => [...ct, prev.replace("...", " - done")]);
+                  }
+                  return parsed.status;
+                });
                 break;
               }
               case "done": {
@@ -347,6 +359,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: "Something went wrong. Please try again." }]);
     } finally {
       setTypingStatus("");
+      setCompletedTools([]);
     }
   }, [activeConvoId, user, queryClient, onConversationContext]);
 
@@ -479,12 +492,12 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           </div>
         ))}
 
-        {typingStatus && (
+        {(typingStatus || completedTools.length > 0) && (
           <div className="flex items-start">
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground mr-2 mt-0.5">
               C
             </div>
-            <TypingIndicator status={typingStatus} />
+            <TypingIndicator status={typingStatus} completedTools={completedTools} />
           </div>
         )}
 
