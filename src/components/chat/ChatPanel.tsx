@@ -36,9 +36,6 @@ const TypingIndicator = ({ status, completedTools }: { status: string; completed
   </div>
 );
 
-const WELCOME_TEMPLATE = (firstName: string) =>
-  `Hey ${firstName}! I'm Caselli Cowork, your AI coworker. I've reviewed your business profile and I'm ready to help. Here are a few things I can do right now:\n\n- **Draft social media posts** for your listings\n- **Track your deals** and flag upcoming deadlines\n- **Write emails** in your voice to clients and vendors\n- **Manage your contacts** and follow-up reminders\n\nWhat would you like to tackle first?`;
-
 function parseConversationContext(toolsUsed: { tool: string; description: string; deal_id?: string; contact_id?: string }[]): ConversationContext {
   const toolNames = toolsUsed.map((t) => t.tool);
 
@@ -142,26 +139,83 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const sendWelcomeMessage = async () => {
     if (!user) return;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user.id)
-      .single();
+    const [profileRes, dealsRes, taskRes] = await Promise.all([
+      supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+      supabase
+        .from("deals")
+        .select("*")
+        .eq("user_id", user.id)
+        .not("stage", "in", '("closed","fell_through")')
+        .order("closing_date", { ascending: true }),
+      supabase
+        .from("task_history")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
 
-    const fullName = profile?.full_name || "";
+    const fullName = profileRes.data?.full_name || "";
     const firstName = fullName.split(" ")[0] || "there";
+    const deals = dealsRes.data || [];
+    const tasks = taskRes.data || [];
+
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+    let content = greeting + ", " + firstName + "! ";
+
+    if (deals.length === 0 && tasks.length === 0) {
+      content += "I'm Caselli Cowork, your AI coworker. I've reviewed your business profile and I'm ready to help.\n\nHere are a few things I can do right now:\n\n";
+      content += "- **Track your deals** and flag upcoming deadlines\n";
+      content += "- **Draft social media posts** for your listings\n";
+      content += "- **Write emails** in your voice to clients and vendors\n";
+      content += "- **Manage your contacts** and follow-up reminders\n\n";
+      content += "What would you like to tackle first?";
+    } else {
+      content += "Here's your quick briefing:\n\n";
+      content += "**Pipeline:** " + deals.length + " active deal" + (deals.length !== 1 ? "s" : "") + "\n";
+
+      const now = new Date();
+      const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const nowStr = now.toISOString().split("T")[0];
+      const threeDayStr = threeDays.toISOString().split("T")[0];
+
+      const urgentDeadlines: { property: string; type: string; date: string }[] = [];
+      for (const d of deals) {
+        for (const [field, label] of [
+          ["closing_date", "Closing"],
+          ["inspection_deadline", "Inspection"],
+          ["financing_deadline", "Financing"],
+          ["appraisal_deadline", "Appraisal"],
+        ] as const) {
+          const val = (d as any)[field];
+          if (val && val >= nowStr && val <= threeDayStr) {
+            urgentDeadlines.push({ property: d.property_address, type: label, date: val });
+          }
+        }
+      }
+
+      if (urgentDeadlines.length > 0) {
+        content += "\n**Urgent deadlines:**\n";
+        for (const dl of urgentDeadlines) {
+          content += "- " + dl.type + " for " + dl.property + " on " + dl.date + "\n";
+        }
+      }
+
+      content += "\nWhat would you like to focus on?";
+    }
 
     const { data: convo, error: convoErr } = await supabase
       .from("conversations")
-      .insert({ user_id: user.id, title: "Welcome" })
+      .insert({ user_id: user.id, title: greeting + " briefing" })
       .select()
       .single();
     if (convoErr || !convo) return;
 
-    const welcomeContent = WELCOME_TEMPLATE(firstName);
     const { data: msg } = await supabase
       .from("messages")
-      .insert({ conversation_id: convo.id, role: "assistant", content: welcomeContent })
+      .insert({ conversation_id: convo.id, role: "assistant", content })
       .select()
       .single();
 
