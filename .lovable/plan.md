@@ -1,46 +1,51 @@
 
 
-# Fix Chat Model ID + Wire Up Activity Panel Context IDs
+# Phase 1: Replace Dark Theme with Light Manus-Inspired Palette
 
-## 1. Update Anthropic Model to Latest (`supabase/functions/chat/index.ts`)
+The audit's #1 recommendation: swap the entire `:root` color block in `index.css` from the current dark/saturated theme to a minimal, near-monochrome light palette with warm tan (#A1866F) as the sole accent.
 
-Replace `claude-sonnet-4-5-20241022` with `claude-sonnet-4-5-20250929` at lines 552 and 666.
+## Current State
+- Dark background (HSL 350 30% 14%), pink primary (340 82% 52%), gold accent (45 100% 58%)
+- Every page inherits these — one file change transforms the entire app
 
-## 2. Pass Deal/Contact IDs Through SSE (`supabase/functions/chat/index.ts`)
+## Target Palette (from audit spec)
 
-Currently `toolsUsed` entries are `{ tool, description }`. Extend to include optional `deal_id` and `contact_id` extracted from tool inputs:
+| Variable | Current | New |
+|---|---|---|
+| `--background` | 350 30% 14% (dark plum) | 40 20% 99% (off-white) |
+| `--foreground` | 15 40% 92% (light) | 20 10% 15% (near-black) |
+| `--card` | 345 25% 17% | 0 0% 100% (white) |
+| `--card-foreground` | 15 40% 92% | 20 10% 15% |
+| `--popover` | 345 25% 17% | 0 0% 100% |
+| `--popover-foreground` | 15 40% 92% | 20 10% 15% |
+| `--primary` | 340 82% 52% (pink) | 25 28% 54% (warm tan #A1866F) |
+| `--primary-foreground` | 0 0% 100% | 0 0% 100% (white — stays) |
+| `--secondary` | 345 20% 20% | 40 15% 96% (light warm gray) |
+| `--secondary-foreground` | 15 40% 92% | 20 10% 15% |
+| `--muted` | 345 20% 20% | 40 15% 96% |
+| `--muted-foreground` | 15 15% 60% | 20 8% 55% (medium gray) |
+| `--accent` | 45 100% 58% (gold) | 25 28% 54% (same as primary — remove gold) |
+| `--accent-foreground` | 350 30% 14% | 0 0% 100% |
+| `--destructive` | 0 84% 60% | 0 72% 51% (slightly muted red) |
+| `--destructive-foreground` | 0 0% 100% | 0 0% 100% |
+| `--border` | 345 15% 22% | 20 10% 90% (light gray) |
+| `--input` | 345 15% 22% | 20 10% 90% |
+| `--ring` | 340 82% 52% | 25 28% 54% |
+| `--sidebar-background` | 350 30% 12% | 40 15% 97% |
+| `--sidebar-foreground` | 15 40% 92% | 20 10% 15% |
+| `--sidebar-primary` | 340 82% 52% | 25 28% 54% |
+| `--sidebar-primary-foreground` | 0 0% 100% | 0 0% 100% |
+| `--sidebar-accent` | 345 20% 18% | 40 15% 94% |
+| `--sidebar-accent-foreground` | 15 40% 92% | 20 10% 15% |
+| `--sidebar-border` | 345 15% 22% | 20 10% 90% |
+| `--sidebar-ring` | 340 82% 52% | 25 28% 54% |
 
-- When pushing to `toolsUsed` (line 606), also capture `tool.input.deal_id` and `tool.input.contact_id` if present
-- For `search_contacts`/`add_contact` results, capture the returned contact ID from the tool result
-- The `done` SSE event already sends `tools_used`, so no change needed there
+## File Modified: 1
+- `src/index.css` — replace all `:root` CSS custom properties
 
-New shape: `{ tool: string; description: string; deal_id?: string; contact_id?: string }`
-
-## 3. Extract IDs in `parseConversationContext` (`src/components/chat/ChatPanel.tsx`)
-
-Update the function to scan `toolsUsed` for the last `deal_id` and `contact_id`:
-
-```typescript
-function parseConversationContext(toolsUsed: { tool: string; description: string; deal_id?: string; contact_id?: string }[]): ConversationContext {
-  // ... existing topic detection ...
-  
-  let lastDealId: string | undefined;
-  let lastContactId: string | undefined;
-  
-  for (const t of toolsUsed) {
-    if (t.deal_id) lastDealId = t.deal_id;
-    if (t.contact_id) lastContactId = t.contact_id;
-  }
-  
-  return { topic, lastToolUsed, lastDealId, lastContactId };
-}
-```
-
-## 4. Stripe Price IDs (Flagged — Not Actionable Yet)
-
-`src/pages/Billing.tsx` contains placeholder Stripe price IDs (`price_1T4t1q...`, etc.). These need real IDs from your Stripe account. This is a configuration task — let me know when you have the real price IDs and I'll swap them in.
-
-## Files Modified: 2
-- `supabase/functions/chat/index.ts` — model ID + entity ID capture
-- `src/components/chat/ChatPanel.tsx` — parse deal/contact IDs from tools_used
+## Remaining Phases (for future prompts)
+- **Phase 2**: Chat input polish, message animations, slide-over transitions
+- **Phase 3**: Heading sizes, page padding, skeleton loaders
+- **Phase 4**: Mobile polish (tab animation, bottom nav, swipe)
+- **Phase 5**: Empty states, billing integration, conversation management
 
