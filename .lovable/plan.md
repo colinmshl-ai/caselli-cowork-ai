@@ -1,22 +1,20 @@
 
 
-# Fix Activity Panel Real-Time Recent Activity
+# Replace Static Welcome with Dynamic Morning Briefing
 
-## Changes
+## Changes — `src/components/chat/ChatPanel.tsx` only
 
-### 1. `src/components/chat/ActivityPanel.tsx`
+### 1. Delete `WELCOME_TEMPLATE` constant (lines 39-40)
+Remove the static template string entirely.
 
-**A. Add refresh options to deals query (lines 60-69):** Add `refetchOnWindowFocus: true` to the deals useQuery options.
+### 2. Replace `sendWelcomeMessage` function (lines 142-171)
+Replace with a dynamic version that:
+- Fetches user's active deals (excluding closed/fell_through) and recent task history in parallel
+- Builds a time-of-day greeting (morning/afternoon/evening)
+- For new users (no deals/tasks): shows the original capability list
+- For returning users: shows pipeline count, flags urgent deadlines within 3 days (closing, inspection, financing, appraisal), and prompts for focus
+- Creates conversation titled with the greeting + "briefing"
 
-**B. Add refresh options to taskHistory query (lines 71-85):** Add `refetchInterval: 10000` and `refetchOnWindowFocus: true` to the taskHistory useQuery options.
-
-**C. Replace task history rendering (lines 244-252):** Replace the horizontal layout with a vertical layout using a primary-colored dot indicator and stacked description + timestamp.
-
-### 2. `src/components/chat/ChatPanel.tsx`
-
-**Invalidate activity queries after streaming completes (after line 323):** Add two `queryClient.invalidateQueries` calls for `["activity-deals"]` and `["activity-tasks"]` so the activity panel refreshes immediately after chat actions complete.
-
-## Files Modified: 2
-- `src/components/chat/ActivityPanel.tsx`
+## Files Modified: 1
 - `src/components/chat/ChatPanel.tsx`
 
