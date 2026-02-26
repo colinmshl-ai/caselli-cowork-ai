@@ -579,7 +579,7 @@ MULTI-ACTION BEHAVIOR:
             if (!anthropicRes.ok) {
               const errText = await anthropicRes.text();
               console.error("Anthropic API error:", errText);
-              sendSSE(controller, "error", { message: "AI service error" });
+              sendSSE(controller, "error", { message: `Chat error: ${errText.slice(0, 200)}` });
               controller.close();
               return;
             }
@@ -699,7 +699,7 @@ MULTI-ACTION BEHAVIOR:
                   "content-type": "application/json",
                 },
                 body: JSON.stringify({
-                  model: "claude-sonnet-4-5-20250929",
+                  model: "claude-sonnet-4-5-20250514",
                   system: "You extract important facts from conversations. Return ONLY a JSON array.",
                   messages: [{
                     role: "user",
@@ -743,7 +743,7 @@ MULTI-ACTION BEHAVIOR:
         } catch (err) {
           console.error("Streaming error:", err);
           try {
-            sendSSE(controller, "error", { message: "Internal server error" });
+            sendSSE(controller, "error", { message: `Chat error: ${(err as Error)?.message || 'Unknown error'}` });
           } catch { /* controller may be closed */ }
           try { controller.close(); } catch { /* already closed */ }
         }
@@ -760,7 +760,7 @@ MULTI-ACTION BEHAVIOR:
     });
   } catch (err) {
     console.error("Chat function error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+    return new Response(JSON.stringify({ error: `Chat error: ${(err as Error)?.message || 'Unknown error'}` }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
