@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow, startOfDay, endOfWeek, startOfWeek, format } from "date-fns";
-import { Home, FileText, UserPlus, RefreshCw, Clock, Activity, Search, Mail } from "lucide-react";
+import { Home, FileText, UserPlus, RefreshCw, Clock, Activity, Search, Mail, ChevronRight } from "lucide-react";
 import type { ConversationContext } from "@/pages/Chat";
 
 const DEFAULT_ACTIONS = [
@@ -203,18 +203,18 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
 
         <div key={topic} className="space-y-8 transition-opacity duration-200 animate-in fade-in">
           {topic === "general" && (
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2.5">
               {stats.map((s) => (
-                <div key={s.label} className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{s.label}</span>
-                  <span className="text-sm font-semibold text-foreground">{s.value}</span>
+                <div key={s.label} className="bg-card border border-border rounded-lg p-3">
+                  <span className="text-lg font-semibold text-foreground">{s.value}</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
                 </div>
               ))}
             </div>
           )}
 
           {topic === "deals" && focusedDeal && (
-            <div className="border border-border rounded-md px-4 py-3 space-y-1.5">
+            <div className="border border-border rounded-lg p-4 shadow-sm space-y-1.5">
               <p className="text-sm font-medium text-foreground">{focusedDeal.property_address}</p>
               <div className="flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full ${STAGE_COLORS[focusedDeal.stage] || "bg-muted-foreground"}`} />
@@ -235,7 +235,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           )}
 
           {topic === "contacts" && focusedContact && (
-            <div className="border border-border rounded-md px-4 py-3 space-y-1.5">
+            <div className="border border-border rounded-lg p-4 shadow-sm space-y-1.5">
               <p className="text-sm font-medium text-foreground">{focusedContact.full_name}</p>
               <p className="text-xs text-muted-foreground capitalize">{focusedContact.contact_type}</p>
               {focusedContact.last_contacted && (
@@ -247,17 +247,21 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           )}
 
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              {sectionTitle}
-            </h3>
-            <div className="space-y-1">
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
+                {sectionTitle}
+              </h3>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="space-y-0.5">
               {quickActions.map((a) => (
                 <button
                   key={a.label}
                   onClick={() => onQuickAction(a.message)}
-                  className="block w-full text-left text-sm text-primary hover:opacity-70 transition-opacity min-h-[44px] py-2.5"
+                  className="flex w-full items-center justify-between text-left text-sm text-foreground bg-transparent hover:bg-secondary/50 rounded-lg min-h-[44px] px-3 py-2.5 transition-colors duration-150"
                 >
-                  {a.label}
+                  <span>{a.label}</span>
+                  <ChevronRight size={14} className="text-muted-foreground shrink-0" />
                 </button>
               ))}
             </div>
@@ -265,24 +269,32 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
         </div>
 
         <div>
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Recent Activity
-          </h3>
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
+              Recent Activity
+            </h3>
+            <div className="flex-1 h-px bg-border" />
+          </div>
           {taskHistory.length === 0 ? (
             <p className="text-sm text-muted-foreground">No activity yet</p>
           ) : (
-            <div className="space-y-3">
-              {taskHistory.map((t) => (
-                <div key={t.id} className="flex items-start gap-2.5">
-                  {getTaskIcon(t.task_type)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground leading-snug truncate">{t.description || t.task_type}</p>
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
-                    </span>
+            <div className="relative ml-[3px]">
+              {/* Timeline line */}
+              <div className="absolute left-0 top-1 bottom-1 w-px bg-border" />
+              <div className="space-y-0">
+                {taskHistory.map((t) => (
+                  <div key={t.id} className="flex items-start gap-3 py-2 relative">
+                    {/* Dot */}
+                    <div className="relative z-10 mt-1.5 h-1.5 w-1.5 rounded-full bg-border shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground leading-snug truncate">{t.description || t.task_type}</p>
+                      <span className="text-[10px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>
