@@ -516,7 +516,13 @@ RULES:
 - If asked something outside your expertise, say so honestly.
 - Use your tools proactively. Do not wait to be explicitly asked if the context makes it obvious.
 - After every response, think: "What would a great assistant do next?" and suggest it.
-- Never give one-word or minimal answers. Always add value.`;
+- Never give one-word or minimal answers. Always add value.
+
+MULTI-ACTION BEHAVIOR:
+- When a user request involves multiple related actions, execute them all in sequence using your tools.
+- Example: "Add a new listing at 123 Oak Ave for buyer Mike Torres, list price 450k" should trigger: create_deal, then search_contacts for Mike Torres, then add_contact if not found, then offer to draft a social post.
+- You have up to 5 tool calls per message. Use them.
+- After completing a chain of actions, summarize everything you did in a clear list.`;
 
     const apiMessages = [
       ...history.map((m: { role: string; content: string }) => ({
@@ -542,6 +548,8 @@ RULES:
           const toolsUsed: { tool: string; description: string }[] = [];
           let currentMessages = [...apiMessages];
           let iterations = 0;
+          let lastCreatedDealId: string | null = null;
+          let lastCreatedContactId: string | null = null;
 
           while (iterations < 5) {
             iterations++;
@@ -621,6 +629,17 @@ RULES:
                   adminClient
                 );
 
+                // Track entity IDs from tool results
+                if (result && typeof result === "object" && !Array.isArray(result)) {
+                  const r = result as Record<string, unknown>;
+                  if (tool.name === "create_deal" && r.id) lastCreatedDealId = r.id as string;
+                  if (tool.name === "add_contact" && r.id) lastCreatedContactId = r.id as string;
+                  if (tool.name === "get_deal_details" && r.id) lastCreatedDealId = r.id as string;
+                }
+                if (tool.name === "search_contacts" && Array.isArray(result) && result.length > 0) {
+                  lastCreatedContactId = (result[0] as Record<string, unknown>).id as string;
+                }
+
                 // Log to task_history (non-blocking)
                 adminClient.from("task_history").insert({
                   user_id: userId,
@@ -645,7 +664,7 @@ RULES:
           }
 
           // Send done event
-          sendSSE(controller, "done", { tools_used: toolsUsed });
+          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId });
 
           // Save assistant message
           const assistantContent = fullText || "I wasn't able to generate a response.";

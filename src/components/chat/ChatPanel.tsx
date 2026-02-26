@@ -270,6 +270,13 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
               case "done": {
                 const parsed = JSON.parse(evt.data);
                 toolsUsed = parsed.tools_used || [];
+                // Capture entity IDs from done event
+                if (parsed.last_deal_id || parsed.last_contact_id) {
+                  const ctx = parseConversationContext(toolsUsed);
+                  ctx.lastDealId = parsed.last_deal_id || undefined;
+                  ctx.lastContactId = parsed.last_contact_id || undefined;
+                  onConversationContext?.(ctx);
+                }
                 break;
               }
               case "error": {
