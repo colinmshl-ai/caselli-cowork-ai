@@ -1,36 +1,38 @@
 
 
-# Improve Deals Page: Better Cards, Pipeline View, and Form Validation
+# Improve Contacts Page
 
-## Changes
+## File: `src/pages/Contacts.tsx`
 
-### 1. Richer deal cards (`src/pages/Deals.tsx`)
-- Show list price (formatted as currency), deal type badge (Buyer/Seller), and client name on every card
-- Already has colored dot for stage — keep it, but also add a light-colored background badge (e.g., `bg-blue-100 text-blue-700` for Lead)
-- Format price with `Intl.NumberFormat`
+### Contact cards with colored badges and timestamps
+- Replace plain text type labels with colored badge spans using a `TYPE_COLORS` map:
+  - Client = `bg-blue-500/10 text-blue-700`, Lead = `bg-green-500/10 text-green-700`, Vendor = `bg-orange-500/10 text-orange-700`, Agent = `bg-purple-500/10 text-purple-700`, Lender = `bg-amber-500/10 text-amber-700`
+- Add relative time display ("Added 2 min ago") using `formatDistanceToNow` from date-fns on `created_at`
 
-### 2. Pipeline/Kanban view toggle (`src/pages/Deals.tsx`)
-- Add a view toggle (List | Board) in the header next to "Add Deal"
-- **List view**: current layout with richer cards
-- **Board view**: horizontal scrolling columns, one per stage (excluding "all"). Each column header shows stage name, deal count, and total value
-- Deals render as compact cards inside columns
-- Add drag-and-drop using HTML5 native `draggable` + `onDragOver`/`onDrop` (no library needed for simple column moves). On drop, update the deal's stage via Supabase mutation
+### Search improvements
+- Extend the filter function to also search `notes` and `contact_type` fields (currently only searches name, email, company)
 
-### 3. Deal detail slide-over enhancements (`src/components/deals/DealSlideOver.tsx`)
-- When editing, show a "Deal Activity" section at the bottom that fetches from `task_history` where `metadata->deal_id` matches the deal id, displayed as a simple timeline
-- Add 3 quick action buttons below the header when editing: "Draft email to client", "Create social post", "Update stage" — these navigate to chat with a pre-filled prompt (via URL param or callback)
+### Import button
+- Add a disabled "Import" button next to "Add Contact" with a tooltip/badge saying "Coming soon"
 
-### 4. Form validation (`src/components/deals/DealSlideOver.tsx`)
-- Add `addressError` state, set on blur and on save attempt
-- Show `<p className="text-xs text-destructive mt-1">Property address is required</p>` below the address input when empty
-- Add `border-destructive` to the input when error is active
-- Clear error on typing
+### Linked deals count on cards
+- Fetch deals alongside contacts (separate query or joined) and show deal count per contact by matching `client_name` or `client_email`
 
-### New file
-- `src/components/deals/DealBoardView.tsx` — Kanban board component (extracted for clarity)
+## File: `src/components/contacts/ContactSlideOver.tsx`
 
-### Files modified: 3
-- `src/pages/Deals.tsx` — richer cards, view toggle, board view integration
-- `src/components/deals/DealSlideOver.tsx` — validation errors, activity timeline, quick actions
-- `src/components/deals/DealBoardView.tsx` — new Kanban board component
+### Linked deals section
+- When editing, fetch deals where `client_name` matches the contact's name or `client_email` matches email
+- Display as a compact list with property address and stage badge
+
+### Quick action buttons
+- Add 3 buttons below the header when editing: "Draft email", "Add to deal", "Schedule follow-up"
+- "Draft email" and "Schedule follow-up" navigate to `/chat?prompt=...` with pre-filled prompt
+- "Add to deal" shows a toast "Coming soon" for now
+
+### Recent activity
+- Fetch from `task_history` where metadata contains the contact name/email, show as timeline
+
+## Files modified: 2
+- `src/pages/Contacts.tsx`
+- `src/components/contacts/ContactSlideOver.tsx`
 
