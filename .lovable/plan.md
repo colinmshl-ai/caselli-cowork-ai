@@ -1,32 +1,42 @@
 
 
-# Chat Experience Improvements
+# Contextual Typing Indicator
 
-## 1. Install `react-markdown` and render assistant messages with markdown
+## Changes
 
-**File: `src/components/chat/ChatPanel.tsx`**
-- Import `ReactMarkdown` from `react-markdown`
-- For assistant messages, replace `<p className="whitespace-pre-wrap">{m.content}</p>` with `<ReactMarkdown>` wrapped in a `prose prose-sm` container
-- User messages stay as plain `<p>` text
+### 1. Edge function: Add `tools_used` to response (`supabase/functions/chat/index.ts`)
 
-## 2. Welcome message for first-time users
+- Create a `toolsUsed` array at the start of the tool loop
+- Define a description map: `get_active_deals` → "Looking up your deals...", etc.
+- Each time a tool_use block is processed, push `{ tool, description }` to the array
+- Include `tools_used` in the final JSON response alongside `response`
 
-**File: `src/components/chat/ChatPanel.tsx`**
-- After conversations query loads: if `conversations.length === 0` and not yet initialized, auto-create a conversation titled "Welcome", insert an assistant message with the personalized welcome text, and display it
-- Fetch user's `full_name` from profiles table, extract first name
-- Welcome content uses the exact copy provided, with `[first name]` replaced
-- Store as a real `messages` row with `role: "assistant"` so it persists
+### 2. ChatPanel: Dynamic typing status (`src/components/chat/ChatPanel.tsx`)
 
-## 3. Typing indicator shows "Caselli is thinking..."
+- Replace `const [typing, setTyping] = useState(false)` with `const [typingStatus, setTypingStatus] = useState("")`
+- Update `TypingIndicator` to accept a `status: string` prop and render it
+- In `sendMessage`:
+  - Set `typingStatus("Thinking...")` before the edge function call
+  - After response arrives, if `tools_used` array is non-empty, sequentially flash each tool description for 600ms using a small async loop with `setTimeout`
+  - After all tool descriptions shown (or if none), clear `typingStatus("")` and display the response
+- Update render: show indicator when `typingStatus !== ""` instead of `typing`
+- Update auto-scroll dependency from `typing` to `typingStatus`
 
-**File: `src/components/chat/ChatPanel.tsx`**
-- Replace the `TypingIndicator` bouncing dots with a text-based indicator: `"Caselli is thinking..."` with a subtle pulse animation
-- Keep the "C" avatar next to it
+### Tool description map (edge function)
 
-## 4. Remove `await memoryExtractionPromise` in edge function
+```
+get_active_deals       → "Looking up your deals..."
+get_deal_details       → "Pulling deal details..."
+update_deal            → "Updating your deal..."
+check_upcoming_deadlines → "Checking your deadlines..."
+create_deal            → "Creating a new deal..."
+draft_social_post      → "Drafting a social post..."
+draft_listing_description → "Writing a listing description..."
+draft_email            → "Drafting an email..."
+search_contacts        → "Searching your contacts..."
+add_contact            → "Adding a new contact..."
+update_contact         → "Updating contact info..."
+```
 
-**File: `supabase/functions/chat/index.ts`**
-- Delete lines 601-602 (`await memoryExtractionPromise;` and the comment)
-- The promise will fire-and-forget; Deno's runtime will still complete it before isolate shutdown
-- Move `return new Response(...)` up immediately after the promise is created
+**2 files modified. No database changes.**
 
