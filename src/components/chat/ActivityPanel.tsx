@@ -66,6 +66,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
       return data;
     },
     enabled: !!user,
+    refetchInterval: 30000,
     refetchOnWindowFocus: true,
   });
 

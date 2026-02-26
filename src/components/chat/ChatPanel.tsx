@@ -293,6 +293,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         let sseBuffer = "";
         const streamingContentRef = { current: "" };
         let toolsUsed: { tool: string; description: string }[] = [];
+        let errorSeen = false;
         let updateScheduled = false;
 
         const scheduleUpdate = () => {
@@ -347,6 +348,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
               }
               case "error": {
                 const parsed = JSON.parse(evt.data);
+                errorSeen = true;
                 streamingContentRef.current = parsed.message || "Something went wrong.";
                 scheduleUpdate();
                 break;
@@ -356,7 +358,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         }
 
         // Final content update
-        const finalContent = streamingContentRef.current || "I wasn't able to generate a response.";
+        const finalContent = streamingContentRef.current || (errorSeen ? "Something went wrong. Please try again." : "I wasn't able to generate a response.");
         setMessages((prev) =>
           prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent } : m))
         );
