@@ -103,22 +103,34 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
     setInput("");
     resetTextarea();
 
-    // Simulate assistant response
+    // Call AI edge function
     setTyping(true);
-    setTimeout(async () => {
-      const assistantMsg = {
-        conversation_id: convoId,
-        role: "assistant",
-        content: "I'm being connected to my AI brain — this will work soon!",
-      };
-      const { data: savedAssistant } = await supabase
+    try {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke("chat", {
+        body: { conversation_id: convoId, message: text.trim() },
+      });
+
+      if (fnError) throw fnError;
+
+      const assistantContent = fnData?.response || "Sorry, I couldn't generate a response.";
+      // Fetch the saved assistant message from DB to get proper id/timestamps
+      const { data: latestMessages } = await supabase
         .from("messages")
-        .insert(assistantMsg)
-        .select()
-        .single();
-      if (savedAssistant) setMessages((prev) => [...prev, savedAssistant]);
+        .select("*")
+        .eq("conversation_id", convoId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (latestMessages?.[0]) {
+        setMessages((prev) => [...prev, latestMessages[0]]);
+      } else {
+        setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: assistantContent }]);
+      }
+    } catch (err) {
+      console.error("Chat error:", err);
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: "Something went wrong. Please try again." }]);
+    } finally {
       setTyping(false);
-    }, 1000);
+    }
   }, [activeConvoId, user, queryClient]);
 
   useEffect(() => {
