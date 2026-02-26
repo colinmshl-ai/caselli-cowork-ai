@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Plus, ArrowUp, ChevronDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import ContentCardRenderer from "./ContentCardRenderer";
+import CopyButton from "./CopyButton";
 
 interface ChatPanelProps {
   pendingPrompt: string | null;
@@ -290,11 +291,16 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
               className={`text-sm leading-relaxed ${
                 m.role === "user"
                   ? "bg-secondary rounded-2xl rounded-br-md px-4 py-2.5 max-w-[75%]"
-                  : "max-w-[85%] text-foreground"
+                  : "max-w-[85%] text-foreground group relative"
               }`}
             >
               {m.role === "assistant" ? (
-                <ContentCardRenderer content={m.content} />
+                <>
+                  <ContentCardRenderer content={m.content} />
+                  <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <CopyButton text={m.content} />
+                  </div>
+                </>
               ) : (
                 <p className="whitespace-pre-wrap">{m.content}</p>
               )}
