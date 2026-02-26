@@ -7,6 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import ContentCardRenderer from "./ContentCardRenderer";
 import CopyButton from "./CopyButton";
 import EntityLinker from "./EntityLinker";
+import SuggestionChips from "./SuggestionChips";
 import type { ConversationContext } from "@/pages/Chat";
 
 const DEAL_TOOLS = ["get_active_deals", "get_deal_details", "update_deal", "check_upcoming_deadlines", "create_deal"];
@@ -103,6 +104,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const welcomeSent = useRef(false);
   const [completedTools, setCompletedTools] = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [lastToolUsed, setLastToolUsed] = useState<string | undefined>();
+  const [lastTopic, setLastTopic] = useState<string | undefined>();
 
   // Mobile keyboard handling via visualViewport
   useEffect(() => {
@@ -273,7 +276,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
     setInput("");
     resetTextarea();
     setTypingStatus("Thinking...");
-
+    setLastToolUsed(undefined);
+    setLastTopic(undefined);
     try {
       const session = (await supabase.auth.getSession()).data.session;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -402,6 +406,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         if (toolsUsed.length > 0) {
           const ctx = parseConversationContext(toolsUsed);
           onConversationContext?.(ctx);
+          setLastToolUsed(ctx.lastToolUsed);
+          setLastTopic(ctx.topic);
         }
       } else {
         // Fallback: JSON response (non-streaming)
@@ -416,7 +422,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         const ctx = parseConversationContext(toolsUsed);
         onConversationContext?.(ctx);
-
+        setLastToolUsed(ctx.lastToolUsed);
+        setLastTopic(ctx.topic);
         const assistantContent = fnData?.response || "Sorry, I couldn't generate a response.";
         const { data: latestMessages } = await supabase
           .from("messages")
@@ -581,6 +588,15 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Suggestion chips */}
+      {!typingStatus && messages.length > 0 && (
+        <SuggestionChips
+          lastToolUsed={lastToolUsed}
+          topic={lastTopic}
+          onSend={sendMessage}
+        />
+      )}
 
       {/* Input */}
       <div className="sticky bottom-0 z-10 bg-background px-4 py-3 pb-safe">
