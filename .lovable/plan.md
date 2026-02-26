@@ -1,24 +1,27 @@
 
 
-# Fix Content Card Detection and Rendering
+# Improve Tool Status Display During Streaming
 
-## Changes
+## Changes — `src/components/chat/ChatPanel.tsx` only
 
-### 1. `src/components/chat/ContentCardRenderer.tsx`
+### 1. Replace TypingIndicator component (lines 22-31)
+Replace with a multi-status version that shows completed tools with green dots and the current status with an animated pulse dot.
 
-**A. Replace `detectEmail` (lines 10-14):** Broader detection — handle markdown-wrapped headers (`**Subject:**`), match greeting+closing patterns even without Subject line.
+### 2. Add `completedTools` state (after line 91)
+Add `const [completedTools, setCompletedTools] = useState<string[]>([]);` alongside existing state variables.
 
-**B. Replace `parseEmail` (lines 26-51):** Strip markdown bold from headers before matching, clean body of `**bold**` and `*italic*` artifacts, strip leading dashes/extra newlines.
+### 3. Update `tool_status` handler (lines 265-268)
+Before setting the new status, move the previous non-"Thinking..." status to the `completedTools` list with "done" suffix.
 
-**C. Replace `detectSocial` (lines 16-20):** Add Twitter/X/TikTok to platform list, detect hashtag-heavy content as social posts.
+### 4. Clear `completedTools` in finally block (line 349)
+Add `setCompletedTools([]);` next to `setTypingStatus("")`.
 
-**D. Update `parseSocial` (lines 53-83):** Add markdown cleanup to `postContent` — strip wrapping quotes/backticks/asterisks and inline bold markers. Also update platform regex on line 54 to include new platforms.
+### 5. Update TypingIndicator usage in JSX (line 487)
+Pass `completedTools` prop: `<TypingIndicator status={typingStatus} completedTools={completedTools} />`
 
-### 2. `src/components/chat/EmailCard.tsx`
+### 6. Update render condition (line 482)
+Change to `{(typingStatus || completedTools.length > 0) && (` so completed tools remain visible until cleared.
 
-**Update "To" field (line 13):** If `to` is empty, show "Recipient" in muted style as placeholder.
-
-## Files Modified: 2
-- `src/components/chat/ContentCardRenderer.tsx`
-- `src/components/chat/EmailCard.tsx`
+## Files Modified: 1
+- `src/components/chat/ChatPanel.tsx`
 
