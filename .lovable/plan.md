@@ -1,42 +1,36 @@
 
 
-# Refine Chat Interface for Better Usability
+# Improve Deals Page: Better Cards, Pipeline View, and Form Validation
 
 ## Changes
 
-### 1. Message spacing & dividers (`ChatPanel.tsx`)
-- Change messages container from `space-y-4` to `space-y-6`
-- Add `mt-2` extra top margin on assistant messages that follow user messages (visual separation between user→assistant pairs)
+### 1. Richer deal cards (`src/pages/Deals.tsx`)
+- Show list price (formatted as currency), deal type badge (Buyer/Seller), and client name on every card
+- Already has colored dot for stage — keep it, but also add a light-colored background badge (e.g., `bg-blue-100 text-blue-700` for Lead)
+- Format price with `Intl.NumberFormat`
 
-### 2. Pre-stream typing indicator (`ChatPanel.tsx`)
-- Currently sets `typingStatus("Thinking...")` but the typing indicator only shows when `typingStatus` is set — it already works. However, there's a gap: after the SSE stream starts, the placeholder message is added and typingStatus is cleared to `""`, causing the dots to disappear before any text arrives.
-- Fix: keep typingStatus as "Thinking..." until the first `text_delta` event arrives, rather than clearing it when the placeholder is created (line 321-322). Move `setTypingStatus("")` into the `text_delta` handler (first delta only).
+### 2. Pipeline/Kanban view toggle (`src/pages/Deals.tsx`)
+- Add a view toggle (List | Board) in the header next to "Add Deal"
+- **List view**: current layout with richer cards
+- **Board view**: horizontal scrolling columns, one per stage (excluding "all"). Each column header shows stage name, deal count, and total value
+- Deals render as compact cards inside columns
+- Add drag-and-drop using HTML5 native `draggable` + `onDragOver`/`onDrop` (no library needed for simple column moves). On drop, update the deal's stage via Supabase mutation
 
-### 3. Input area improvements (`ChatPanel.tsx`)
-- Make send button slightly larger: `h-9 w-9` (from `h-8 w-8`)
-- Add hint text below the input container: `<p className="text-[10px] text-muted-foreground text-center mt-1.5">Press Enter to send · Shift+Enter for new line</p>`
-- Shift+Enter already works (only Enter without shift triggers send)
+### 3. Deal detail slide-over enhancements (`src/components/deals/DealSlideOver.tsx`)
+- When editing, show a "Deal Activity" section at the bottom that fetches from `task_history` where `metadata->deal_id` matches the deal id, displayed as a simple timeline
+- Add 3 quick action buttons below the header when editing: "Draft email to client", "Create social post", "Update stage" — these navigate to chat with a pre-filled prompt (via URL param or callback)
 
-### 4. Copy button consistency (`CopyButton.tsx`)
-- Already shows "Copied" with checkmark for 2 seconds — this works correctly
-- Add consistent positioning: wrap in a `p-1.5 rounded-md bg-background/80 backdrop-blur-sm` container so it's always visible and positioned the same way
-- Update the parent in `ChatPanel.tsx`: position the copy button wrapper with `absolute -top-1 -right-1` and add `z-10`
+### 4. Form validation (`src/components/deals/DealSlideOver.tsx`)
+- Add `addressError` state, set on blur and on save attempt
+- Show `<p className="text-xs text-destructive mt-1">Property address is required</p>` below the address input when empty
+- Add `border-destructive` to the input when error is active
+- Clear error on typing
 
-### 5. Welcome message fix & clickable capabilities (`ChatPanel.tsx`)
-- Fix bullet text: already reads "Track your deals and flag upcoming deadlines" — verify rendering. The issue is likely markdown rendering stripping bold markers. Ensure the list items use full sentences.
-- Make capability bullets clickable: change `sendWelcomeMessage` to use a structured format where each capability line includes the full text. Then in `ContentCardRenderer` or directly in the message rendering, detect the welcome message and render capability items as clickable buttons that send pre-filled prompts.
-- Simpler approach: add a `starterPrompts` state that shows below the welcome message as clickable cards.
+### New file
+- `src/components/deals/DealBoardView.tsx` — Kanban board component (extracted for clarity)
 
-### 6. Empty state / starter prompts (`ChatPanel.tsx`)
-- Replace the generic "Start a conversation" empty state with 4 clickable starter prompt cards:
-  - "I just got a new listing at..."
-  - "Draft a social post for..."
-  - "Give me a pipeline overview"
-  - "Help me follow up with a client"
-- Also show these below the welcome message when it's the only message (no user messages yet)
-- Style as bordered rounded cards with `text-sm text-foreground` and hover state
-
-## Files modified: 2
-- `src/components/chat/ChatPanel.tsx` — spacing, typing indicator fix, input hint, send button size, starter prompts, welcome capabilities
-- `src/components/chat/CopyButton.tsx` — consistent positioning/container styling
+### Files modified: 3
+- `src/pages/Deals.tsx` — richer cards, view toggle, board view integration
+- `src/components/deals/DealSlideOver.tsx` — validation errors, activity timeline, quick actions
+- `src/components/deals/DealBoardView.tsx` — new Kanban board component
 
