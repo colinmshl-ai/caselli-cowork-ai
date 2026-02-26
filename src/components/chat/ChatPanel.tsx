@@ -265,7 +265,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
       </div>
 
       {/* Input */}
-      <div className="border-t border-border px-4 py-3">
+      <div className="sticky bottom-0 z-10 border-t border-border bg-background px-4 py-3">
         <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}

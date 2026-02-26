@@ -88,7 +88,7 @@ const AppLayout = () => {
           <NavLink
             key={to}
             to={to}
-            className="flex flex-col items-center justify-center gap-1 py-1"
+            className="flex flex-col items-center justify-center gap-1 min-h-[44px] min-w-[44px] py-1"
           >
             <Icon
               size={20}

@@ -74,7 +74,8 @@ const Login = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full border-0 border-b border-border bg-transparent pb-2 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground"
+              inputMode="email"
+              className="w-full border-0 border-b border-border bg-transparent py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground"
             />
           </div>
           <div>
@@ -84,14 +85,14 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full border-0 border-b border-border bg-transparent pb-2 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground"
+              className="w-full border-0 border-b border-border bg-transparent py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="w-full rounded-md bg-primary min-h-[44px] py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>
@@ -105,7 +106,7 @@ const Login = () => {
 
         <button
           onClick={handleGoogleLogin}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-md border border-border py-2.5 text-sm text-foreground transition-colors hover:bg-secondary"
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-md border border-border min-h-[44px] py-3 text-sm text-foreground transition-colors hover:bg-secondary"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24">
             <path

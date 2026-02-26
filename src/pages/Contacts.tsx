@@ -85,7 +85,7 @@ const Contacts = () => {
       <div className="border-b border-border px-5 py-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-foreground md:text-2xl">Contacts</h1>
-          <button onClick={openNew} className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
+          <button onClick={openNew} className="rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
             Add Contact
           </button>
         </div>
@@ -106,7 +106,7 @@ const Contacts = () => {
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-md px-3 min-h-[44px] text-xs font-medium transition-colors ${
                 filter === f.value ? "text-primary" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -136,21 +136,39 @@ const Contacts = () => {
               <button
                 key={c.id}
                 onClick={() => openEdit(c)}
-                className="flex w-full items-center gap-4 border-b border-border px-5 py-3.5 text-left transition-colors hover:bg-secondary/50"
+                className="w-full border-b border-border px-5 py-3.5 text-left transition-colors hover:bg-secondary/50 min-h-[44px]"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
+                {/* Mobile card layout */}
+                <div className="md:hidden">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-foreground truncate">{c.full_name}</span>
-                    {c.company && <span className="text-sm text-muted-foreground truncate hidden sm:inline">{c.company}</span>}
+                    <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                      {TYPE_LABELS[c.contact_type] || c.contact_type}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-3 mt-0.5">
+                  <div className="flex items-center gap-3 mt-1">
+                    {c.company && <span className="text-xs text-muted-foreground truncate">{c.company}</span>}
                     {c.email && <span className="text-xs text-muted-foreground truncate">{c.email}</span>}
-                    {c.phone && <span className="text-xs text-muted-foreground hidden sm:inline">{c.phone}</span>}
+                    {c.phone && <span className="text-xs text-muted-foreground">{c.phone}</span>}
                   </div>
                 </div>
-                <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                  {TYPE_LABELS[c.contact_type] || c.contact_type}
-                </span>
+
+                {/* Desktop row layout */}
+                <div className="hidden md:flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-foreground truncate">{c.full_name}</span>
+                      {c.company && <span className="text-sm text-muted-foreground truncate">{c.company}</span>}
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      {c.email && <span className="text-xs text-muted-foreground truncate">{c.email}</span>}
+                      {c.phone && <span className="text-xs text-muted-foreground">{c.phone}</span>}
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                    {TYPE_LABELS[c.contact_type] || c.contact_type}
+                  </span>
+                </div>
               </button>
             ))}
           </div>
