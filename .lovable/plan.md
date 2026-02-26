@@ -1,45 +1,91 @@
 
 
-# Mobile Responsiveness Improvements
+# Streaming Chat Responses via SSE
 
-## 1. `index.html` — Add viewport-fit for safe areas
-- Add `viewport-fit=cover` to the existing viewport meta tag to enable `env(safe-area-inset-bottom)`
+## Overview
+Replace the current request-response pattern with Server-Sent Events (SSE) streaming. The edge function will stream text deltas and tool status events. The frontend will progressively render the assistant's response.
 
-## 2. `src/index.css` — Add safe-area utility
-- Add a `pb-safe` utility class: `padding-bottom: env(safe-area-inset-bottom)`
+## 1. Edge Function (`supabase/functions/chat/index.ts`)
 
-## 3. `src/components/chat/ChatPanel.tsx` — Keyboard handling
-- Add a `useEffect` that listens to `window.visualViewport` `resize` event
-- Track `keyboardHeight` state = `window.innerHeight - visualViewport.height`
-- Apply `keyboardHeight` as extra bottom padding on the messages scroll container (line 315) via inline style
-- Change input container (line 363) from `sticky bottom-0` to include `pb-safe` class for home indicator spacing
+**Keep unchanged:** Auth, context fetching (lines 1-431), `executeTool`, `TOOLS`, `TOOL_DESCRIPTIONS`, system prompt construction, message history building.
 
-## 4. `src/pages/Contacts.tsx` — Mobile card refinement
-- Already has separate mobile/desktop layouts with `md:hidden` / `hidden md:flex`
-- Refine mobile card: ensure first line has name + type badge, second line has email · phone with middle dot separator
-- Current implementation already does this — minor cleanup to add `·` separator between email/phone
+**Replace the Anthropic call + tool loop + response (lines 441-625) with streaming logic:**
 
-## 5. `src/components/deals/DealSlideOver.tsx` — Mobile drag handle
-- After the panel `<div>` opens (line 187), before the header, add a `md:hidden` drag handle bar:
-  ```
-  <div className="flex justify-center pt-2 md:hidden">
-    <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
-  </div>
-  ```
+- Create a `ReadableStream` and return it immediately with `Content-Type: text/event-stream` + CORS headers
+- Inside the stream's `start(controller)` callback, run the async logic:
 
-## 6. `src/components/contacts/ContactSlideOver.tsx` — Same drag handle
-- Same drag handle addition after the panel div opens
+### SSE helper
+```typescript
+function sendSSE(controller, event: string, data: object) {
+  controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+}
+```
 
-## 7. `src/components/AppLayout.tsx` — Bottom nav safe area
-- Add `pb-safe` to the mobile bottom nav bar (currently `h-14`)
-- Update main content `pb-14` to account for safe area
+### Streaming Anthropic call
+- Add `stream: true` to the Anthropic request body
+- Read the response as a stream line-by-line (SSE from Anthropic)
+- Parse Anthropic SSE events:
+  - `content_block_delta` with `delta.type === "text_delta"` → forward as `event: text_delta` with `data: {"text": delta.text}` and accumulate into `fullText`
+  - `content_block_start` with `content_block.type === "tool_use"` → start tracking current tool call (name, id, accumulate input JSON)
+  - `content_block_delta` with `delta.type === "input_json_delta"` → accumulate JSON string for the tool input
+  - `content_block_stop` → if tracking a tool_use block, finalize the tool input
+  - `message_delta` with `stop_reason === "tool_use"` → execute accumulated tools, send `tool_status` events, then make another streaming Anthropic call with tool results and continue parsing
+  - `message_delta` with `stop_reason === "end_turn"` → done
 
-## Files changed: 7
-- `index.html` (viewport-fit)
-- `src/index.css` (pb-safe utility)
-- `src/components/chat/ChatPanel.tsx` (keyboard handling + safe area)
-- `src/pages/Contacts.tsx` (minor mobile card refinement)
-- `src/components/deals/DealSlideOver.tsx` (drag handle)
-- `src/components/contacts/ContactSlideOver.tsx` (drag handle)
-- `src/components/AppLayout.tsx` (safe area on bottom nav)
+### Tool use during streaming
+When `stop_reason === "tool_use"`:
+1. Send `event: tool_status` for each tool being called
+2. Execute all tools via `executeTool()` + log to `task_history`
+3. Build `currentMessages` with assistant content + tool results
+4. Make another streaming Anthropic call with `stream: true`
+5. Continue parsing the new stream (loop up to 5 iterations)
+
+### After streaming completes
+- Send `event: done` with `data: {"tools_used": [...]}`
+- Save complete assistant message to DB
+- Fire memory extraction (non-blocking, same as current)
+- Close the stream
+
+### Error handling
+- Wrap in try/catch; on error send `event: error` then close stream
+
+## 2. Frontend (`src/components/chat/ChatPanel.tsx`)
+
+**Replace `supabase.functions.invoke("chat", ...)` in `sendMessage` with:**
+
+```typescript
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const session = (await supabase.auth.getSession()).data.session;
+const response = await fetch(`${supabaseUrl}/functions/v1/chat`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${session?.access_token}`,
+    "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  },
+  body: JSON.stringify({ conversation_id: convoId, message: text.trim() }),
+});
+```
+
+**Stream reading:**
+- Check `response.headers.get("content-type")` — if `text/event-stream`, use streaming; otherwise fall back to current JSON behavior
+- Use `response.body.getReader()` + `TextDecoder` to read chunks
+- Parse SSE events from the text buffer (split on `\n\n`, extract `event:` and `data:` lines)
+- Before streaming starts, add a placeholder assistant message to `messages` state with empty content
+- On `text_delta`: update the last message's content by appending the delta text
+- On `tool_status`: update `typingStatus` with the tool's status message
+- On `done`: parse `tools_used`, call `onConversationContext`, fetch the saved message from DB to get the real ID, replace the placeholder
+- On `error`: show error in the message
+
+**Key state management:**
+- Use a ref (`streamingContentRef`) to accumulate text without causing re-renders on every character
+- Batch UI updates using `requestAnimationFrame` or a 50ms throttle to avoid excessive re-renders
+- Clear `typingStatus` when text starts streaming (switch from "Thinking..." to showing the actual text)
+
+## 3. Fallback
+- If `response.headers` doesn't indicate SSE, parse as JSON and use the existing `fnData.response` / `fnData.tools_used` flow (unchanged from current code)
+
+## Files modified: 2
+- `supabase/functions/chat/index.ts` (streaming response)
+- `src/components/chat/ChatPanel.tsx` (stream reader)
 
