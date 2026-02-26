@@ -1,41 +1,32 @@
 
 
-# E2E Test Results & Fix Plan
+# Chat Experience Improvements
 
-## Issues Found
+## 1. Install `react-markdown` and render assistant messages with markdown
 
-### 1. CRITICAL: Onboarding page is blank (infinite redirect loop)
-`ProtectedRoute` redirects to `/onboarding` when `onboarding_completed === false`. But `/onboarding` is wrapped in `<ProtectedRoute>` in App.tsx, causing an infinite redirect loop → blank page.
+**File: `src/components/chat/ChatPanel.tsx`**
+- Import `ReactMarkdown` from `react-markdown`
+- For assistant messages, replace `<p className="whitespace-pre-wrap">{m.content}</p>` with `<ReactMarkdown>` wrapped in a `prose prose-sm` container
+- User messages stay as plain `<p>` text
 
-**Fix:** In `ProtectedRoute.tsx`, add a `useLocation()` check — skip the onboarding redirect when the current path is already `/onboarding`.
+## 2. Welcome message for first-time users
 
-### 2. Billing page "Back to app" link broken for new users
-`/billing` has `<a href="/chat">← Back to app</a>`. For new users who haven't completed onboarding yet, clicking this sends them into the broken onboarding loop. This link should conditionally show based on whether the user has an active subscription.
+**File: `src/components/chat/ChatPanel.tsx`**
+- After conversations query loads: if `conversations.length === 0` and not yet initialized, auto-create a conversation titled "Welcome", insert an assistant message with the personalized welcome text, and display it
+- Fetch user's `full_name` from profiles table, extract first name
+- Welcome content uses the exact copy provided, with `[first name]` replaced
+- Store as a real `messages` row with `role: "assistant"` so it persists
 
-**Fix:** Only show "Back to app" if the user has completed onboarding (query profile). Otherwise just show "Sign out".
+## 3. Typing indicator shows "Caselli is thinking..."
 
-### 3. Console error: "Function components cannot be given refs" on App
-The `ErrorBoundary` wraps `App` but React tries to pass a ref to the arrow function component. This is a warning, not breaking.
+**File: `src/components/chat/ChatPanel.tsx`**
+- Replace the `TypingIndicator` bouncing dots with a text-based indicator: `"Caselli is thinking..."` with a subtle pulse animation
+- Keep the "C" avatar next to it
 
-**Fix:** No action needed — this is a React development-mode warning from the router, not from ErrorBoundary itself.
+## 4. Remove `await memoryExtractionPromise` in edge function
 
-### 4. Footer links non-functional (cosmetic)
-Landing page footer has About/Privacy/Terms/Contact as plain `<span>` elements with no links. Already identified in previous audit — the clickable cursor styling was removed but they're still non-functional text.
-
-**Fix:** Already addressed (cursor styling removed). No further action needed.
-
----
-
-## Implementation Steps
-
-### File: `src/components/ProtectedRoute.tsx`
-- Import `useLocation` from react-router-dom
-- Before the onboarding redirect check, get current pathname
-- Skip the onboarding redirect if `location.pathname === "/onboarding"`
-
-### File: `src/pages/Billing.tsx`
-- Query profile to check `onboarding_completed` 
-- Only show "Back to app" link if `onboarding_completed === true`
-
-**2 files modified. No database changes.**
+**File: `supabase/functions/chat/index.ts`**
+- Delete lines 601-602 (`await memoryExtractionPromise;` and the comment)
+- The promise will fire-and-forget; Deno's runtime will still complete it before isolate shutdown
+- Move `return new Response(...)` up immediately after the promise is created
 
