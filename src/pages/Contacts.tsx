@@ -3,9 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Search } from "lucide-react";
+import { Search, Upload } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import ContactSlideOver from "@/components/contacts/ContactSlideOver";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const FILTERS = [
   { value: "all", label: "All" },
@@ -23,6 +25,15 @@ const TYPE_LABELS: Record<string, string> = {
   agent: "Agent",
   lender: "Lender",
   other: "Other",
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  client: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  lead: "bg-green-500/10 text-green-700 dark:text-green-400",
+  vendor: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+  agent: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
+  lender: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  other: "bg-muted text-muted-foreground",
 };
 
 const Contacts = () => {
@@ -48,6 +59,28 @@ const Contacts = () => {
     enabled: !!user,
   });
 
+  const { data: deals = [] } = useQuery({
+    queryKey: ["deals"],
+    queryFn: async () => {
+      if (!user) throw new Error("Not authenticated");
+      const { data, error } = await supabase
+        .from("deals")
+        .select("id, client_name, client_email, property_address, stage")
+        .eq("user_id", user.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const getDealCount = (contact: any) => {
+    return deals.filter(
+      (d) =>
+        (d.client_name && contact.full_name && d.client_name.toLowerCase() === contact.full_name.toLowerCase()) ||
+        (d.client_email && contact.email && d.client_email.toLowerCase() === contact.email.toLowerCase())
+    ).length;
+  };
+
   const filtered = contacts.filter((c) => {
     if (filter !== "all" && c.contact_type !== filter) return false;
     if (search) {
@@ -55,7 +88,9 @@ const Contacts = () => {
       return (
         c.full_name?.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q) ||
-        c.company?.toLowerCase().includes(q)
+        c.company?.toLowerCase().includes(q) ||
+        c.notes?.toLowerCase().includes(q) ||
+        c.contact_type?.toLowerCase().includes(q)
       );
     }
     return true;
@@ -83,14 +118,36 @@ const Contacts = () => {
     setEditingContact(null);
   };
 
+  const TypeBadge = ({ type }: { type: string }) => (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TYPE_COLORS[type] || TYPE_COLORS.other}`}>
+      {TYPE_LABELS[type] || type}
+    </span>
+  );
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-5 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h1 className="text-base font-semibold text-foreground">Contacts</h1>
-          <button onClick={openNew} className="rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
-            Add Contact
-          </button>
+          <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    disabled
+                    className="flex items-center gap-1.5 rounded-md border border-border px-3 min-h-[44px] py-2.5 text-sm font-medium text-muted-foreground opacity-60 cursor-not-allowed"
+                  >
+                    <Upload size={14} />
+                    Import
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Coming soon</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <button onClick={openNew} className="rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
+              Add Contact
+            </button>
+          </div>
         </div>
 
         <div className="relative mt-3">
@@ -143,45 +200,66 @@ const Contacts = () => {
           </div>
         ) : (
           <div>
-            {filtered.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => openEdit(c)}
-                className="w-full border-b border-border px-5 py-3.5 text-left transition-colors hover:bg-secondary/50 min-h-[44px]"
-              >
-                {/* Mobile card layout */}
-                <div className="md:hidden">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-foreground truncate">{c.full_name}</span>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                      {TYPE_LABELS[c.contact_type] || c.contact_type}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                    {c.email && <span className="truncate">{c.email}</span>}
-                    {c.email && c.phone && <span>·</span>}
-                    {c.phone && <span>{c.phone}</span>}
-                  </div>
-                </div>
+            {filtered.map((c) => {
+              const dealCount = getDealCount(c);
+              const timeAgo = c.created_at
+                ? formatDistanceToNow(new Date(c.created_at), { addSuffix: true })
+                : null;
 
-                {/* Desktop row layout */}
-                <div className="hidden md:flex items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => openEdit(c)}
+                  className="w-full border-b border-border px-5 py-3.5 text-left transition-colors hover:bg-secondary/50 min-h-[44px]"
+                >
+                  {/* Mobile card layout */}
+                  <div className="md:hidden">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium text-foreground truncate">{c.full_name}</span>
-                      {c.company && <span className="text-sm text-muted-foreground truncate">{c.company}</span>}
+                      <TypeBadge type={c.contact_type} />
                     </div>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      {c.email && <span className="text-xs text-muted-foreground truncate">{c.email}</span>}
-                      {c.phone && <span className="text-xs text-muted-foreground">{c.phone}</span>}
+                    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                      {c.email && <span className="truncate">{c.email}</span>}
+                      {c.email && c.phone && <span>·</span>}
+                      {c.phone && <span>{c.phone}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {dealCount > 0 && (
+                        <span className="text-[11px] text-muted-foreground">
+                          {dealCount} deal{dealCount !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                      {timeAgo && (
+                        <span className="text-[11px] text-muted-foreground/60">Added {timeAgo}</span>
+                      )}
                     </div>
                   </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                    {TYPE_LABELS[c.contact_type] || c.contact_type}
-                  </span>
-                </div>
-              </button>
-            ))}
+
+                  {/* Desktop row layout */}
+                  <div className="hidden md:flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-foreground truncate">{c.full_name}</span>
+                        {c.company && <span className="text-sm text-muted-foreground truncate">{c.company}</span>}
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        {c.email && <span className="text-xs text-muted-foreground truncate">{c.email}</span>}
+                        {c.phone && <span className="text-xs text-muted-foreground">{c.phone}</span>}
+                        {dealCount > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            · {dealCount} deal{dealCount !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                        {timeAgo && (
+                          <span className="text-xs text-muted-foreground/60">· Added {timeAgo}</span>
+                        )}
+                      </div>
+                    </div>
+                    <TypeBadge type={c.contact_type} />
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
