@@ -1,25 +1,62 @@
 
 
-# Add Copy Buttons with Lucide Icons
+# Context-Aware Activity Panel
 
-## 1. Update `src/components/chat/CopyButton.tsx`
-- Add lucide-react imports: `Copy`, `Check`
-- Replace text-only button with icon + text: `<Copy size={14} />` + "Copy" in default state, `<Check size={14} />` + "Copied" in copied state
-- Styling: `flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors`
-- Copied state icon uses `text-primary`
+## Overview
 
-## 2. Content cards already use `<CopyButton>` — no changes needed
-`SocialPostCard`, `EmailCard`, `ListingCard` already import and render `CopyButton` in their bottom bars with appropriate text props.
+Make the ActivityPanel react to conversation context by tracking which tools the AI used and dynamically swapping the middle section (stats/quick actions) based on the topic.
 
-## 3. Add hover copy button to assistant messages in `src/components/chat/ChatPanel.tsx`
-- Import `CopyButton`
-- On the assistant message wrapper div (line 289-293), add `group relative` classes
-- Inside that div, after `<ContentCardRenderer>`, add a positioned CopyButton:
-  ```
-  <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-    <CopyButton text={m.content} />
-  </div>
-  ```
+## Changes
 
-**3 files total: 1 updated component, 1 modified integration point. Cards already wired.**
+### 1. `src/pages/Chat.tsx`
+- Add `ConversationContext` interface: `{ lastToolUsed?: string; lastDealId?: string; lastContactId?: string; topic?: 'deals' | 'content' | 'contacts' | 'general' }`
+- Add `conversationContext` state, default `{ topic: 'general' }`
+- Add `onConversationContext` callback prop to `ChatPanel` so it can report context after each response
+- Pass `conversationContext` to `ActivityPanel`
+
+### 2. `src/components/chat/ChatPanel.tsx`
+- Add `onConversationContext` optional prop
+- After receiving response and flashing tool descriptions, parse `tools_used` to determine topic:
+  - Deal tools (`get_active_deals`, `get_deal_details`, `update_deal`, `check_upcoming_deadlines`, `create_deal`) → topic `'deals'`
+  - Content tools (`draft_social_post`, `draft_listing_description`, `draft_email`) → topic `'content'`
+  - Contact tools (`search_contacts`, `add_contact`, `update_contact`) → topic `'contacts'`
+  - Otherwise → `'general'`
+- Extract `lastDealId`/`lastContactId` from `fnData.tool_results` if available (check for `deal_id` or `contact_id` keys in the metadata)
+- Call `onConversationContext({ topic, lastToolUsed, lastDealId, lastContactId })`
+
+### 3. `src/components/chat/ActivityPanel.tsx`
+- Add `conversationContext` prop with the `ConversationContext` interface
+- Keep greeting + date always visible at top
+- Keep Recent Activity always visible at bottom
+- Middle section wrapped in a `div` with `transition-opacity duration-200`; use a key based on `topic` to trigger re-render/fade
+
+**Topic-specific middle sections:**
+
+**`deals`:**
+- If `lastDealId` provided, fetch deal from supabase and show mini card: property address (text-sm font-medium), stage dot + label, next deadline, client name
+- Quick actions: "Check deadlines for this deal", "Draft update email to client", "Update deal stage"
+
+**`content`:**
+- Quick actions: "Draft another post", "Try a different tone", "Draft for a different platform", "Write a follow-up email"
+
+**`contacts`:**
+- If `lastContactId` provided, fetch contact and show: name, type badge, last contacted date
+- Quick actions: "Draft follow-up email", "Check related deals", "Update contact info"
+
+**`general` (default):**
+- Current stats + current quick actions (unchanged)
+
+### 4. Mini deal card styling
+- `border border-border rounded-md px-4 py-3 space-y-1.5`
+- Address: `text-sm font-medium text-foreground`
+- Stage: small colored dot (green for active, yellow for under_contract, etc.) + `text-xs text-muted-foreground`
+- Next deadline: `text-xs text-muted-foreground`
+- Client: `text-xs text-muted-foreground`
+
+### 5. Mini contact card styling
+- Same container as deal card
+- Name: `text-sm font-medium text-foreground`
+- Type + last contacted: `text-xs text-muted-foreground`
+
+**3 files modified. No database changes.**
 
