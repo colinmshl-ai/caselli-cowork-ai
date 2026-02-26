@@ -5,6 +5,7 @@ import ListingCard from "./ListingCard";
 
 interface ContentCardRendererProps {
   content: string;
+  onAction?: (message: string) => void;
 }
 
 function detectEmail(content: string) {
@@ -133,7 +134,7 @@ function parseListing(content: string) {
   return { intro, address, stats: statsLine, description };
 }
 
-const ContentCardRenderer = ({ content }: ContentCardRendererProps) => {
+const ContentCardRenderer = ({ content, onAction }: ContentCardRendererProps) => {
   if (detectEmail(content)) {
     const { intro, to, subject, body } = parseEmail(content);
     return (
@@ -143,7 +144,7 @@ const ContentCardRenderer = ({ content }: ContentCardRendererProps) => {
             <ReactMarkdown>{intro}</ReactMarkdown>
           </div>
         )}
-        <EmailCard to={to} subject={subject} body={body} />
+        <EmailCard to={to} subject={subject} body={body} onAction={onAction} />
       </>
     );
   }
@@ -157,7 +158,7 @@ const ContentCardRenderer = ({ content }: ContentCardRendererProps) => {
             <ReactMarkdown>{intro}</ReactMarkdown>
           </div>
         )}
-        <SocialPostCard platform={platform} content={postContent} />
+        <SocialPostCard platform={platform} content={postContent} onAction={onAction} />
       </>
     );
   }
@@ -171,7 +172,7 @@ const ContentCardRenderer = ({ content }: ContentCardRendererProps) => {
             <ReactMarkdown>{intro}</ReactMarkdown>
           </div>
         )}
-        <ListingCard address={address} stats={stats} description={description} />
+        <ListingCard address={address} stats={stats} description={description} onAction={onAction} />
       </>
     );
   }
