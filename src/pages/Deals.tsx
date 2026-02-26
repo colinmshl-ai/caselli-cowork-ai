@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import DealSlideOver from "@/components/deals/DealSlideOver";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const STAGES = [
   { value: "all", label: "All" },
@@ -113,7 +114,7 @@ const Deals = () => {
       {/* Header */}
       <div className="border-b border-border px-5 py-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-foreground md:text-2xl">Deals</h1>
+          <h1 className="text-base font-semibold text-foreground">Deals</h1>
           <button
             onClick={openNew}
             className="rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
@@ -143,8 +144,16 @@ const Deals = () => {
       {/* Deal list */}
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div className="px-5 py-5 space-y-1">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 py-3.5 border-b border-border">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/5" />
+                  <Skeleton className="h-3 w-2/5" />
+                </div>
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
           </div>
         ) : deals.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
