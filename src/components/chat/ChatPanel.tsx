@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, MutableRefObject, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, MutableRefObject } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,14 +30,11 @@ const TypingIndicator = ({ status }: { status: string }) => (
 const WELCOME_TEMPLATE = (firstName: string) =>
   `Hey ${firstName}! I'm Caselli, your AI coworker. I've reviewed your business profile and I'm ready to help. Here are a few things I can do right now:\n\n- **Draft social media posts** for your listings\n- **Track your deals** and flag upcoming deadlines\n- **Write emails** in your voice to clients and vendors\n- **Manage your contacts** and follow-up reminders\n\nWhat would you like to tackle first?`;
 
-function parseConversationContext(fnData: any): ConversationContext {
-  const toolsUsed: { tool: string; description: string }[] = fnData?.tools_used || [];
+function parseConversationContext(toolsUsed: { tool: string; description: string }[]): ConversationContext {
   const toolNames = toolsUsed.map((t) => t.tool);
 
   let topic: ConversationContext["topic"] = "general";
   let lastToolUsed: string | undefined;
-  let lastDealId: string | undefined;
-  let lastContactId: string | undefined;
 
   if (toolNames.some((t) => DEAL_TOOLS.includes(t))) {
     topic = "deals";
@@ -51,19 +48,27 @@ function parseConversationContext(fnData: any): ConversationContext {
     lastToolUsed = toolNames[toolNames.length - 1];
   }
 
-  // Extract IDs from tool_results if available
-  const toolResults = fnData?.tool_results;
-  if (Array.isArray(toolResults)) {
-    for (const result of toolResults) {
-      if (result?.deal_id) lastDealId = result.deal_id;
-      if (result?.contact_id) lastContactId = result.contact_id;
+  return { topic, lastToolUsed };
+}
+
+// Parse SSE events from a text buffer, returns [parsed events, remaining buffer]
+function parseSSEBuffer(buffer: string): [{ event: string; data: string }[], string] {
+  const events: { event: string; data: string }[] = [];
+  const parts = buffer.split("\n\n");
+  const remaining = parts.pop() || ""; // last part may be incomplete
+
+  for (const part of parts) {
+    if (!part.trim()) continue;
+    let event = "message";
+    let data = "";
+    for (const line of part.split("\n")) {
+      if (line.startsWith("event: ")) event = line.slice(7);
+      else if (line.startsWith("data: ")) data = line.slice(6);
     }
-  } else if (toolResults && typeof toolResults === "object") {
-    if (toolResults.deal_id) lastDealId = toolResults.deal_id;
-    if (toolResults.contact_id) lastContactId = toolResults.contact_id;
+    if (data) events.push({ event, data });
   }
 
-  return { topic, lastToolUsed, lastDealId, lastContactId };
+  return [events, remaining];
 }
 
 const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext }: ChatPanelProps) => {
@@ -164,7 +169,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
     }
   }, [pendingPrompt, user]);
 
-  // Expose send function
+  // Main send function with SSE streaming
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || !user) return;
 
@@ -191,37 +196,137 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
     setInput("");
     resetTextarea();
-
     setTypingStatus("Thinking...");
+
     try {
-      const { data: fnData, error: fnError } = await supabase.functions.invoke("chat", {
-        body: { conversation_id: convoId, message: text.trim() },
+      const session = (await supabase.auth.getSession()).data.session;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ conversation_id: convoId, message: text.trim() }),
       });
 
-      if (fnError) throw fnError;
+      const contentType = response.headers.get("content-type") || "";
 
-      // Flash tool descriptions
-      const toolsUsed: { tool: string; description: string }[] = fnData?.tools_used || [];
-      for (const t of toolsUsed) {
-        setTypingStatus(t.description);
-        await new Promise((r) => setTimeout(r, 600));
-      }
+      if (contentType.includes("text/event-stream") && response.body) {
+        // SSE streaming path
+        const placeholderId = crypto.randomUUID();
+        setMessages((prev) => [...prev, { id: placeholderId, role: "assistant", content: "" }]);
+        setTypingStatus("");
 
-      // Update conversation context
-      const ctx = parseConversationContext(fnData);
-      onConversationContext?.(ctx);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let sseBuffer = "";
+        const streamingContentRef = { current: "" };
+        let toolsUsed: { tool: string; description: string }[] = [];
+        let updateScheduled = false;
 
-      const assistantContent = fnData?.response || "Sorry, I couldn't generate a response.";
-      const { data: latestMessages } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("conversation_id", convoId)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (latestMessages?.[0]) {
-        setMessages((prev) => [...prev, latestMessages[0]]);
+        const scheduleUpdate = () => {
+          if (updateScheduled) return;
+          updateScheduled = true;
+          requestAnimationFrame(() => {
+            updateScheduled = false;
+            const content = streamingContentRef.current;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === placeholderId ? { ...m, content } : m))
+            );
+          });
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          sseBuffer += decoder.decode(value, { stream: true });
+          const [events, remaining] = parseSSEBuffer(sseBuffer);
+          sseBuffer = remaining;
+
+          for (const evt of events) {
+            switch (evt.event) {
+              case "text_delta": {
+                const parsed = JSON.parse(evt.data);
+                streamingContentRef.current += parsed.text;
+                scheduleUpdate();
+                break;
+              }
+              case "tool_status": {
+                const parsed = JSON.parse(evt.data);
+                setTypingStatus(parsed.status);
+                break;
+              }
+              case "done": {
+                const parsed = JSON.parse(evt.data);
+                toolsUsed = parsed.tools_used || [];
+                break;
+              }
+              case "error": {
+                const parsed = JSON.parse(evt.data);
+                streamingContentRef.current = parsed.message || "Something went wrong.";
+                scheduleUpdate();
+                break;
+              }
+            }
+          }
+        }
+
+        // Final content update
+        const finalContent = streamingContentRef.current || "I wasn't able to generate a response.";
+        setMessages((prev) =>
+          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent } : m))
+        );
+
+        // Fetch the saved message from DB to get the real ID
+        const { data: latestMessages } = await supabase
+          .from("messages")
+          .select("*")
+          .eq("conversation_id", convoId)
+          .eq("role", "assistant")
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (latestMessages?.[0]) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === placeholderId ? latestMessages[0] : m))
+          );
+        }
+
+        // Update conversation context
+        if (toolsUsed.length > 0) {
+          const ctx = parseConversationContext(toolsUsed);
+          onConversationContext?.(ctx);
+        }
       } else {
-        setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: assistantContent }]);
+        // Fallback: JSON response (non-streaming)
+        const fnData = await response.json();
+        if (!response.ok) throw new Error(fnData.error || "Request failed");
+
+        const toolsUsed: { tool: string; description: string }[] = fnData?.tools_used || [];
+        for (const t of toolsUsed) {
+          setTypingStatus(t.description);
+          await new Promise((r) => setTimeout(r, 600));
+        }
+
+        const ctx = parseConversationContext(toolsUsed);
+        onConversationContext?.(ctx);
+
+        const assistantContent = fnData?.response || "Sorry, I couldn't generate a response.";
+        const { data: latestMessages } = await supabase
+          .from("messages")
+          .select("*")
+          .eq("conversation_id", convoId)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (latestMessages?.[0]) {
+          setMessages((prev) => [...prev, latestMessages[0]]);
+        } else {
+          setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: assistantContent }]);
+        }
       }
     } catch (err) {
       console.error("Chat error:", err);
