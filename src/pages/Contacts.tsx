@@ -148,10 +148,10 @@ const Contacts = () => {
                       {TYPE_LABELS[c.contact_type] || c.contact_type}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    {c.company && <span className="text-xs text-muted-foreground truncate">{c.company}</span>}
-                    {c.email && <span className="text-xs text-muted-foreground truncate">{c.email}</span>}
-                    {c.phone && <span className="text-xs text-muted-foreground">{c.phone}</span>}
+                  <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                    {c.email && <span className="truncate">{c.email}</span>}
+                    {c.email && c.phone && <span>·</span>}
+                    {c.phone && <span>{c.phone}</span>}
                   </div>
                 </div>
 
