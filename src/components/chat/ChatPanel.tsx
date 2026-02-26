@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Plus, ArrowUp, ChevronDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import ContentCardRenderer from "./ContentCardRenderer";
-import CopyButton from "./CopyButton";
+
 import EntityLinker from "./EntityLinker";
 import SuggestionChips from "./SuggestionChips";
 import type { ConversationContext } from "@/pages/Chat";
@@ -22,18 +22,18 @@ interface ChatPanelProps {
 }
 
 const TypingIndicator = ({ status, completedTools }: { status: string; completedTools: string[] }) => (
-  <div className="flex flex-wrap gap-1.5 px-2 py-1">
+  <div className="flex flex-wrap gap-1.5 py-2">
     {completedTools.map((tool, i) => (
       <span
         key={i}
-        className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-accent text-accent-foreground animate-fade-in"
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-accent/10 text-accent-foreground animate-fade-in"
       >
         <span className="text-primary">✓</span>
         {tool}
       </span>
     ))}
     {status && (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-primary/10 text-primary">
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary">
         <span className="flex gap-0.5">
           <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "0ms" }} />
           <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "200ms" }} />
@@ -564,7 +564,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 md:space-y-8" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
         {messages.length === 0 && !typingStatus && (
           <div className="flex flex-col items-center justify-center h-full gap-6">
             <p className="text-sm text-muted-foreground">Start a conversation with Caselli Cowork</p>
@@ -589,27 +589,17 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         {messages.map((m, idx) => (
           <div key={m.id} className={`flex animate-fade-in-up ${m.role === "user" ? "justify-end" : "justify-start"} ${m.role === "assistant" && idx > 0 && messages[idx - 1]?.role === "user" ? "mt-2" : ""}`}>
-            {m.role === "assistant" && (
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground mr-2 mt-0.5">
-                C
-              </div>
-            )}
             <div
               className={`text-sm leading-relaxed ${
                 m.role === "user"
-                  ? "bg-secondary rounded-2xl rounded-br-md px-4 py-2.5 max-w-[75%]"
-                  : "max-w-[85%] text-foreground group relative"
+                  ? "border border-border bg-transparent rounded-xl px-4 py-2.5 max-w-[70%]"
+                  : "max-w-[85%] md:max-w-[95%] text-foreground"
               }`}
             >
               {m.role === "assistant" ? (
-                <>
-                  <EntityLinker dealId={m.lastDealId} contactId={m.lastContactId}>
-                    <ContentCardRenderer content={m.content} onAction={sendMessage} />
-                  </EntityLinker>
-                  <div className="absolute -top-1 -right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <CopyButton text={m.content} />
-                  </div>
-                </>
+                <EntityLinker dealId={m.lastDealId} contactId={m.lastContactId}>
+                  <ContentCardRenderer content={m.content} onAction={sendMessage} />
+                </EntityLinker>
               ) : (
                 <p className="whitespace-pre-wrap">{m.content}</p>
               )}
@@ -638,12 +628,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         )}
 
         {(typingStatus || completedTools.length > 0) && (
-          <div className="flex items-start">
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground mr-2 mt-0.5">
-              C
-            </div>
-            <TypingIndicator status={typingStatus} completedTools={completedTools} />
-          </div>
+          <TypingIndicator status={typingStatus} completedTools={completedTools} />
         )}
 
         <div ref={messagesEndRef} />
