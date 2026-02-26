@@ -27,7 +27,7 @@ export const RecoveryEmail = ({
     <Preview>Reset your password for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Text style={brand}>Caselli</Text>
+        <Text style={brand}>Caselli Cowork</Text>
         <Heading style={h1}>Reset your password</Heading>
         <Text style={text}>
           We received a request to reset your password for {siteName}. Click
@@ -68,7 +68,7 @@ const text = {
   margin: '0 0 25px',
 }
 const button = {
-  backgroundColor: '#A1866F',
+  backgroundColor: '#E91E63',
   color: '#ffffff',
   fontSize: '14px',
   fontWeight: '500' as const,

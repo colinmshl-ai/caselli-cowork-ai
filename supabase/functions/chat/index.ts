@@ -463,7 +463,7 @@ Deno.serve(async (req) => {
     const history = historyRes.data || [];
 
     // Build system prompt
-    let systemPrompt = `You are Caselli, an AI coworker built specifically for real estate agents. You work alongside the agent every day, helping with communications, content, deal tracking, scheduling, and strategy.\n\n`;
+    let systemPrompt = `You are Caselli Cowork, an AI coworker built specifically for real estate agents. You work alongside the agent every day, helping with communications, content, deal tracking, scheduling, and strategy.\n\n`;
 
     if (profile) {
       const fields: [string, string | null | undefined][] = [

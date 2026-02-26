@@ -35,7 +35,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "Caselli Cowork AI"
+const SITE_NAME = "Caselli Cowork"
 const SENDER_DOMAIN = "notify.reddog.agency"
 const ROOT_DOMAIN = "reddog.agency"
 const FROM_DOMAIN = "reddog.agency" // Domain shown in From address (may be root or sender subdomain)

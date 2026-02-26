@@ -125,7 +125,7 @@ const Onboarding = () => {
     <div className="min-h-screen bg-background flex flex-col items-center px-4">
       {/* Wordmark */}
       <div className="pt-8 pb-6">
-        <span className="text-base font-semibold text-foreground tracking-tight">Caselli</span>
+        <span className="text-base text-foreground tracking-tight"><span className="font-serif font-semibold">Caselli</span> <span className="font-sans font-light">Cowork</span></span>
       </div>
 
       {/* Progress bar */}

@@ -33,14 +33,21 @@ const plans = [
   },
 ];
 
+const Wordmark = ({ className = "" }: { className?: string }) => (
+  <span className={className}>
+    <span className="font-serif">Caselli</span>{" "}
+    <span className="font-sans font-light">Cowork</span>
+  </span>
+);
+
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
           <Link to="/" className="text-base font-semibold text-foreground tracking-tight">
-            Caselli
+            <Wordmark />
           </Link>
           <div className="flex items-center gap-6">
             <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -62,7 +69,7 @@ const Index = () => {
           Your AI Real Estate Coworker
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground md:text-lg">
-          Caselli handles your follow-ups, content, deals, and client communications — so you can focus on closing.
+          Caselli Cowork handles your follow-ups, content, deals, and client communications — so you can focus on closing.
         </p>
         <Link
           to="/signup"

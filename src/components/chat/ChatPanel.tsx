@@ -28,7 +28,7 @@ const TypingIndicator = ({ status }: { status: string }) => (
 );
 
 const WELCOME_TEMPLATE = (firstName: string) =>
-  `Hey ${firstName}! I'm Caselli, your AI coworker. I've reviewed your business profile and I'm ready to help. Here are a few things I can do right now:\n\n- **Draft social media posts** for your listings\n- **Track your deals** and flag upcoming deadlines\n- **Write emails** in your voice to clients and vendors\n- **Manage your contacts** and follow-up reminders\n\nWhat would you like to tackle first?`;
+  `Hey ${firstName}! I'm Caselli Cowork, your AI coworker. I've reviewed your business profile and I'm ready to help. Here are a few things I can do right now:\n\n- **Draft social media posts** for your listings\n- **Track your deals** and flag upcoming deadlines\n- **Write emails** in your voice to clients and vendors\n- **Manage your contacts** and follow-up reminders\n\nWhat would you like to tackle first?`;
 
 function parseConversationContext(toolsUsed: { tool: string; description: string }[]): ConversationContext {
   const toolNames = toolsUsed.map((t) => t.tool);
@@ -433,7 +433,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
         {messages.length === 0 && !typingStatus && (
           <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-muted-foreground">Start a conversation with Caselli</p>
+            <p className="text-sm text-muted-foreground">Start a conversation with Caselli Cowork</p>
           </div>
         )}
 
@@ -485,7 +485,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Ask Caselli anything..."
+            placeholder="Ask Caselli Cowork anything..."
             rows={1}
             className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none max-h-[120px]"
           />
