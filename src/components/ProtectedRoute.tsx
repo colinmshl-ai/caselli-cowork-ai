@@ -1,10 +1,11 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, user, loading } = useAuth();
+  const location = useLocation();
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile-sub", user?.id],
@@ -31,8 +32,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
 
-  // Check onboarding
-  if (profile && !profile.onboarding_completed) {
+  // Check onboarding (skip if already on /onboarding)
+  if (profile && !profile.onboarding_completed && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" replace />;
   }
 
