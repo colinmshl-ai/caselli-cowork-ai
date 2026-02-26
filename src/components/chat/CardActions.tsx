@@ -15,14 +15,14 @@ interface CardActionsProps {
 const TONES = ["Professional", "Casual", "Luxury", "Friendly"];
 
 const CardActions = ({ contentType, onAction }: CardActionsProps) => (
-  <div className="flex items-center gap-1.5">
+  <div className="flex items-center gap-1">
     <Button
       variant="ghost"
       size="sm"
-      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+      className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
       onClick={() => onAction(`Regenerate this ${contentType}`)}
     >
-      <RefreshCw size={12} className="mr-1" />
+      <RefreshCw size={11} className="mr-1" />
       Regenerate
     </Button>
     <DropdownMenu>
@@ -30,9 +30,9 @@ const CardActions = ({ contentType, onAction }: CardActionsProps) => (
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+          className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
         >
-          <Palette size={12} className="mr-1" />
+          <Palette size={11} className="mr-1" />
           Adjust tone
         </Button>
       </DropdownMenuTrigger>

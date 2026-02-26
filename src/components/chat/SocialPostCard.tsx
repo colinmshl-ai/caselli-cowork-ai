@@ -58,18 +58,13 @@ const SocialPostCard = ({ platform, content, onAction }: SocialPostCardProps) =>
   );
 
   return (
-    <div className="border border-border rounded-md overflow-hidden bg-background mt-3 animate-fade-in-up">
+    <div className="border border-border border-l-4 border-l-violet-400 rounded-md overflow-hidden bg-card mt-3 animate-fade-in-up">
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
+      <div className="px-4 py-2.5 border-b border-border">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
           <Icon size={14} />
           {platform}
         </span>
-        {charInfo && (
-          <span className={`text-[10px] ${limitColor}`}>
-            {limitWarning || charInfo.label}
-          </span>
-        )}
       </div>
 
       {/* Content */}
@@ -77,57 +72,56 @@ const SocialPostCard = ({ platform, content, onAction }: SocialPostCardProps) =>
         <p className="text-sm text-foreground whitespace-pre-wrap">{content}</p>
       </div>
 
-      {/* Stats + actions */}
-      <div className="px-4 py-2.5 border-t border-border space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {charCount} chars · {wordCount} words
-          </span>
-          <div className="flex items-center gap-1">
-            {onAction && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => onAction("Edit this post: make changes as needed")}
-                >
-                  <Pencil size={12} className="mr-1" />
-                  Edit
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+      {/* Footer: stats left, actions right */}
+      <div className="px-4 py-2 flex items-center justify-between">
+        <span className="text-[11px] text-muted-foreground">
+          {charCount} chars · {wordCount} words
+          {charInfo && (
+            <span className={`ml-2 ${limitColor}`}>
+              · {limitWarning || charInfo.label}
+            </span>
+          )}
+        </span>
+        <div className="flex items-center gap-1">
+          {onAction && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={() => onAction("Edit this post: make changes as needed")}
+              >
+                <Pencil size={11} className="mr-1" />
+                Edit
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    <Share2 size={11} className="mr-1" />
+                    Adapt
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  {otherPlatforms.map((p) => (
+                    <DropdownMenuItem
+                      key={p}
+                      onClick={() => onAction?.(`Adapt this post for ${p}`)}
+                      className="text-xs"
                     >
-                      <Share2 size={12} className="mr-1" />
-                      Adapt
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    {otherPlatforms.map((p) => (
-                      <DropdownMenuItem
-                        key={p}
-                        onClick={() => onAction?.(`Adapt this post for ${p}`)}
-                        className="text-xs"
-                      >
-                        {p}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            )}
-            <CopyButton text={content} />
-          </div>
+                      {p}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <CardActions contentType="post" onAction={onAction} />
+            </>
+          )}
+          <CopyButton text={content} />
         </div>
-        {onAction && (
-          <div className="flex items-center justify-end border-t border-border pt-2 -mx-4 px-4">
-            <CardActions contentType="post" onAction={onAction} />
-          </div>
-        )}
       </div>
     </div>
   );
