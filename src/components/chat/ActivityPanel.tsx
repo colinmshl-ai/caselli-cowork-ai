@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { formatDistanceToNow, startOfWeek, endOfWeek, format } from "date-fns";
+import { formatDistanceToNow, startOfDay, endOfWeek, startOfWeek, format } from "date-fns";
+import { Home, FileText, UserPlus, RefreshCw, Clock, Activity, Search, Mail } from "lucide-react";
 import type { ConversationContext } from "@/pages/Chat";
 
 const DEFAULT_ACTIONS = [
@@ -39,6 +40,17 @@ const STAGE_COLORS: Record<string, string> = {
   fell_through: "bg-destructive",
 };
 
+const TASK_TYPE_ICONS: Record<string, React.ElementType> = {
+  deal_create: Home,
+  deal_update: RefreshCw,
+  content_drafted: FileText,
+  contact_updated: UserPlus,
+  contact_added: UserPlus,
+  deadline_check: Clock,
+  search: Search,
+  email_drafted: Mail,
+};
+
 interface ActivityPanelProps {
   onQuickAction: (message: string) => void;
   conversationContext: ConversationContext;
@@ -49,6 +61,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+  const todayStart = startOfDay(now);
   const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const displayName = user?.user_metadata?.full_name?.split(" ")[0] || "there";
@@ -88,6 +101,24 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
     refetchOnWindowFocus: true,
   });
 
+  const { data: recentLeadContacts = [] } = useQuery({
+    queryKey: ["activity-lead-contacts"],
+    queryFn: async () => {
+      if (!user) throw new Error("Not authenticated");
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("contact_type", "lead")
+        .gte("created_at", sevenDaysAgo);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
   const { data: focusedDeal } = useQuery({
     queryKey: ["focused-deal", conversationContext.lastDealId],
     queryFn: async () => {
@@ -124,16 +155,13 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
       return date >= now && date <= sevenDaysOut;
     });
   }).length;
-  const tasksThisWeek = taskHistory.filter((t) => {
-    const created = new Date(t.created_at);
-    return created >= weekStart && created <= weekEnd;
-  }).length;
-  const newLeads = deals.filter((d) => d.stage === "lead").length;
+  const tasksToday = taskHistory.filter((t) => new Date(t.created_at) >= todayStart).length;
+  const newLeads = recentLeadContacts.length;
 
   const stats = [
     { label: "Active Deals", value: activeDeals },
     { label: "Deadlines This Week", value: deadlinesThisWeek },
-    { label: "Tasks Completed", value: tasksThisWeek },
+    { label: "Tasks Today", value: tasksToday },
     { label: "New Leads", value: newLeads },
   ];
 
@@ -149,6 +177,11 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
     return deadlines[0] || null;
   };
 
+  const getTaskIcon = (taskType: string) => {
+    const IconComponent = TASK_TYPE_ICONS[taskType] || Activity;
+    return <IconComponent size={14} className="text-muted-foreground shrink-0 mt-0.5" />;
+  };
+
   const quickActions = topic === "deals" ? DEAL_ACTIONS : topic === "content" ? CONTENT_ACTIONS : topic === "contacts" ? CONTACT_ACTIONS : DEFAULT_ACTIONS;
   const sectionTitle = topic === "deals" ? "Deal Focus" : topic === "content" ? "Content Toolkit" : topic === "contacts" ? "Contact Focus" : "Quick Actions";
 
@@ -159,7 +192,6 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-8">
-        {/* Greeting – always visible */}
         <div>
           <h2 className="text-lg font-semibold text-foreground">
             {greeting}, {displayName}
@@ -169,9 +201,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           </p>
         </div>
 
-        {/* Context-aware middle section */}
         <div key={topic} className="space-y-8 transition-opacity duration-200 animate-in fade-in">
-          {/* Stats – only in general mode */}
           {topic === "general" && (
             <div className="space-y-3">
               {stats.map((s) => (
@@ -183,7 +213,6 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
             </div>
           )}
 
-          {/* Deal mini card */}
           {topic === "deals" && focusedDeal && (
             <div className="border border-border rounded-md px-4 py-3 space-y-1.5">
               <p className="text-sm font-medium text-foreground">{focusedDeal.property_address}</p>
@@ -205,7 +234,6 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
             </div>
           )}
 
-          {/* Contact mini card */}
           {topic === "contacts" && focusedContact && (
             <div className="border border-border rounded-md px-4 py-3 space-y-1.5">
               <p className="text-sm font-medium text-foreground">{focusedContact.full_name}</p>
@@ -218,7 +246,6 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
             </div>
           )}
 
-          {/* Quick Actions */}
           <div>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               {sectionTitle}
@@ -237,7 +264,6 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           </div>
         </div>
 
-        {/* Recent Activity – always visible */}
         <div>
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Recent Activity
@@ -248,7 +274,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
             <div className="space-y-3">
               {taskHistory.map((t) => (
                 <div key={t.id} className="flex items-start gap-2.5">
-                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                  {getTaskIcon(t.task_type)}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-foreground leading-snug truncate">{t.description || t.task_type}</p>
                     <span className="text-[10px] text-muted-foreground">
