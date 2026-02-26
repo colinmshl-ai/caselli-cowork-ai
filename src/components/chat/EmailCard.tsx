@@ -10,7 +10,7 @@ const EmailCard = ({ to, subject, body }: EmailCardProps) => (
   <div className="border border-border rounded-md overflow-hidden bg-background mt-3">
     <div className="px-4 py-3 border-b border-border space-y-1.5">
       <div className="text-xs text-muted-foreground">
-        To: <span className="text-foreground">{to}</span>
+        To: <span className={to ? "text-foreground" : "text-muted-foreground italic"}>{to || "Recipient"}</span>
       </div>
       <div className="text-sm font-medium text-foreground">{subject}</div>
     </div>
