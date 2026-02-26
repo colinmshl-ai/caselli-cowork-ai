@@ -1,24 +1,35 @@
 
 
-# Upgrade System Prompt for Proactive Agentic Behavior
+# Enable Multi-Action Tool Chaining
 
-## Changes — `supabase/functions/chat/index.ts` only
+## Changes
 
-### 1. Replace YOUR PERSONALITY section (lines 492-498)
-Expand to "YOUR PERSONALITY AND BEHAVIOR" with proactive coworker directives: suggest next steps after every task, offer follow-up actions when creating deals or drafting content, flag deadlines within 48 hours, mention stale deal stages.
+### 1. `supabase/functions/chat/index.ts`
 
-### 2. Replace YOUR CAPABILITIES section (lines 499-508)
-Expand to "YOUR CAPABILITIES AND HOW TO USE THEM" with proactive tool usage instructions: auto-search contacts when names are mentioned, check for existing deals when addresses are mentioned, chain related actions together (create deal + add contact + offer social post), auto-populate email recipients from contacts.
+**A. Add entity ID tracking variables** (after line 541, before `while` loop):
+- `let lastCreatedDealId: string | null = null;`
+- `let lastCreatedContactId: string | null = null;`
 
-### 3. Replace RULES section (lines 509-514)
-Expand with additional directives: use tools proactively without waiting to be asked, think "what would a great assistant do next?" after every response, never give minimal answers.
+**B. Capture entity IDs from tool results** (after `executeTool` returns, ~line 622):
+- If `tool.name === "create_deal"` and result has `id`, set `lastCreatedDealId`
+- If `tool.name === "add_contact"` and result has `id`, set `lastCreatedContactId`
+- If `tool.name === "get_deal_details"` and result has `id`, set `lastCreatedDealId`
+- If `tool.name === "search_contacts"` and result is array with items, set `lastCreatedContactId = result[0].id`
 
-### 4. Update model identifier (line 552)
-Change `claude-sonnet-4-5-20250929` → `claude-sonnet-4-5-20250514`
+**C. Include entity IDs in done event** (line 648):
+- Add `last_deal_id: lastCreatedDealId` and `last_contact_id: lastCreatedContactId` to the done payload
 
-### 5. Increase max_tokens (line 556)
-Change `2048` → `4096`
+**D. Add MULTI-ACTION BEHAVIOR section to system prompt** (after line 519, before the closing backtick):
+- Instructions for chaining actions, with example flow and reminder about 5 tool call limit
 
-## Files Modified: 1
+### 2. `src/components/chat/ChatPanel.tsx`
+
+**Update "done" event handler** (lines 270-273):
+- Parse `last_deal_id` and `last_contact_id` from the done event
+- Build context with `parseConversationContext` and set entity IDs
+- Call `onConversationContext` with the enriched context
+
+## Files Modified: 2
 - `supabase/functions/chat/index.ts`
+- `src/components/chat/ChatPanel.tsx`
 
