@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, MutableRefObject } from "reac
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, ArrowUp, Clock, Search, Home, Camera, BarChart3, Users } from "lucide-react";
+import { Plus, ArrowUp, Clock, Search, Home, Camera, BarChart3, Users, RotateCcw } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
@@ -109,6 +109,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [lastToolUsed, setLastToolUsed] = useState<string | undefined>();
   const [lastTopic, setLastTopic] = useState<string | undefined>();
+  const [lastUserMessage, setLastUserMessage] = useState<string>("");
 
   // Mobile keyboard handling via visualViewport
   useEffect(() => {
@@ -291,6 +292,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
     }
 
     const userMsg = { conversation_id: convoId, role: "user", content: text.trim() };
+    setLastUserMessage(text.trim());
     const { data: savedUser } = await supabase.from("messages").insert(userMsg).select().single();
     if (savedUser) setMessages((prev) => [...prev, savedUser]);
 
@@ -393,7 +395,9 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 const parsed = JSON.parse(evt.data);
                 errorSeen = true;
                 streamingContentRef.current = parsed.message || "Something went wrong.";
-                scheduleUpdate();
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === placeholderId ? { ...m, content: streamingContentRef.current, isError: true } : m))
+                );
                 break;
               }
             }
@@ -638,9 +642,20 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
               }`}
             >
               {m.role === "assistant" ? (
-                <EntityLinker dealId={m.lastDealId} contactId={m.lastContactId}>
-                  <ContentCardRenderer content={m.content} onAction={sendMessage} />
-                </EntityLinker>
+                <>
+                  <EntityLinker dealId={m.lastDealId} contactId={m.lastContactId}>
+                    <ContentCardRenderer content={m.content} onAction={sendMessage} />
+                  </EntityLinker>
+                  {m.isError && lastUserMessage && (
+                    <button
+                      onClick={() => sendMessage(lastUserMessage)}
+                      className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <RotateCcw size={12} />
+                      Retry
+                    </button>
+                  )}
+                </>
               ) : (
                 <p className="whitespace-pre-wrap">{m.content}</p>
               )}
