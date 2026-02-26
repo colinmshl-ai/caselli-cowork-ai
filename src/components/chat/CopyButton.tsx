@@ -13,7 +13,7 @@ const CopyButton = ({ text }: { text: string }) => {
   return (
     <button
       onClick={handleCopy}
-      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      className="flex items-center gap-1 p-1.5 rounded-md bg-background/80 backdrop-blur-sm text-xs text-muted-foreground hover:text-foreground transition-colors"
     >
       {copied ? (
         <>
