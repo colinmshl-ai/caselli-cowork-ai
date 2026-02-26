@@ -80,18 +80,21 @@ const DEFAULT_SUGGESTIONS = [
 ];
 
 const SuggestionChips = ({ lastToolUsed, topic, onSend }: SuggestionChipsProps) => {
-  const suggestions =
+  const allSuggestions =
     (lastToolUsed && SUGGESTION_MAP[lastToolUsed]) ||
     (topic && TOPIC_FALLBACK[topic]) ||
     DEFAULT_SUGGESTIONS;
 
+  const suggestions = allSuggestions.slice(0, 3);
+
   return (
-    <div className="flex flex-wrap gap-2 px-4 py-2 animate-fade-in">
-      {suggestions.map((text) => (
+    <div className="flex flex-wrap gap-2 px-4 py-2">
+      {suggestions.map((text, i) => (
         <button
           key={text}
           onClick={() => onSend(text)}
-          className="border border-border rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          className="rounded-lg bg-secondary/60 px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary hover:scale-[1.02] transition-all duration-150 animate-fade-in"
+          style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
         >
           {text}
         </button>
