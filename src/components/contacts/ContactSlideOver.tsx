@@ -87,12 +87,24 @@ const ContactSlideOver = ({ open, contact, onClose, onSaved, onDelete }: Contact
     setSaving(false);
   };
 
-  if (!open) return null;
-
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-foreground/10" onClick={onClose} />
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full md:max-w-[480px] overflow-y-auto bg-background border-l border-border">
+      {/* Overlay */}
+      <div
+        className={cn(
+          "fixed inset-0 z-40 bg-foreground/10 transition-opacity duration-200",
+          open ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onClick={onClose}
+      />
+
+      {/* Panel */}
+      <div
+        className={cn(
+          "fixed right-0 top-0 bottom-0 z-50 w-full md:max-w-[480px] overflow-y-auto bg-background border-l border-border transition-transform duration-300 ease-out",
+          open ? "translate-x-0" : "translate-x-full"
+        )}
+      >
         <div className="flex justify-center pt-2 md:hidden">
           <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
         </div>

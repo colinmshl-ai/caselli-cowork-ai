@@ -20,10 +20,13 @@ interface ChatPanelProps {
 }
 
 const TypingIndicator = ({ status }: { status: string }) => (
-  <div className="flex items-center gap-1 px-2 py-1">
-    <span className="text-sm text-muted-foreground animate-pulse">
-      {status}
+  <div className="flex items-center gap-2 px-2 py-1 animate-fade-in">
+    <span className="flex items-center gap-1">
+      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-typing-dot" style={{ animationDelay: "0ms" }} />
+      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-typing-dot" style={{ animationDelay: "200ms" }} />
+      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-typing-dot" style={{ animationDelay: "400ms" }} />
     </span>
+    <span className="text-sm text-muted-foreground">{status}</span>
   </div>
 );
 
@@ -442,7 +445,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         )}
 
         {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={m.id} className={`flex animate-fade-in-up ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             {m.role === "assistant" && (
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground mr-2 mt-0.5">
                 C
@@ -482,8 +485,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       </div>
 
       {/* Input */}
-      <div className="sticky bottom-0 z-10 border-t border-border bg-background px-4 py-3 pb-safe">
-        <div className="flex items-end gap-2">
+      <div className="sticky bottom-0 z-10 bg-background px-4 py-3 pb-safe">
+        <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 shadow-sm transition-shadow focus-within:ring-1 focus-within:ring-ring">
           <textarea
             ref={textareaRef}
             value={input}
@@ -496,9 +499,9 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim()}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
           >
-            <ArrowUp size={14} />
+            <ArrowUp size={15} />
           </button>
         </div>
       </div>
