@@ -1,55 +1,49 @@
 
 
-# Improve Content Cards with Actions and Metadata
+# Improve Multi-Tool Response Display in Chat
 
 ## Changes
 
-### 1. New file: `src/components/chat/CardActions.tsx`
-Shared action bar component used by all content cards with:
-- **Regenerate** button (sends "Regenerate this [type]" to chat)
-- **Adjust tone** dropdown using brand tones from business profile (professional, casual, luxury, friendly)
-- Both trigger chat messages via an `onAction` callback prop
+### 1. `src/components/chat/ChatPanel.tsx` — Improve tool status pills + clickable entity links
 
-### 2. Update `src/components/chat/SocialPostCard.tsx`
-- Add platform icon in header (Camera for Instagram, MessageCircle for Twitter/X, Users for Facebook, Linkedin for LinkedIn, Video for TikTok)
-- Add character limit bar: show warning text + color when near/over limit (Instagram 2200, Twitter 280, Facebook suggests 500)
-- Add "Edit" button → calls `onAction("Edit this post: make changes as needed")` to populate chat
-- Add "Create for another platform" button → opens small dropdown of other platforms, sends "Adapt this post for [Platform]" to chat
-- Add word count alongside character count
-- Include `CardActions` at bottom
+**Tool status pills (lines 22-37):** Redesign `TypingIndicator` to show pill/chip badges instead of plain text:
+- Completed tools: green-tinted pill with `✓` prefix, e.g. `✓ Deal created`
+- Active tool: pulsing primary-tinted pill with spinner dots, e.g. `Creating deal...`
+- Style: `inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs bg-green-50 text-green-700` for completed, `bg-primary/10 text-primary` for active
 
-### 3. Update `src/components/chat/EmailCard.tsx`
-- Show word count + character count in footer
-- Add "Send" button → shows toast "Coming soon — connect Gmail in Settings"
-- Add "Save as draft" button → inserts into a new `email_drafts` table (or just shows toast "Draft saved" with local state for now — no new table needed, store in `task_history` with type `email_draft`)
-- Include `CardActions` at bottom
+**Clickable entity references in assistant messages (lines 541-547):**
+- After `ContentCardRenderer`, post-process the rendered content to find deal/contact names and wrap them with `<Link>` to `/deals` or `/contacts`
+- Simpler approach: add a new `EntityLinker` wrapper component that uses regex to detect patterns like deal addresses or contact names from the conversation context, and replaces them with clickable links
+- Since deals/contacts pages use slide-overs (no individual routes), link to `/deals?highlight=<id>` and `/contacts?highlight=<id>` using IDs from the `done` SSE event
 
-### 4. Update `src/components/chat/ContentCardRenderer.tsx`
-- Pass an `onAction` callback through to all card components
-- Cards call `onAction(message)` which bubbles up to ChatPanel's `sendMessage`
+**Store entity IDs on messages (line 362-378):**
+- After streaming completes, attach `lastDealId` and `lastContactId` from the `done` event payload to the message state so `EntityLinker` can use them
 
-### 5. Update `src/components/chat/ChatPanel.tsx`
-- Pass `sendMessage` as `onAction` prop to `ContentCardRenderer`
-- ContentCardRenderer passes it down to each card
+### 2. `src/components/chat/ContentCardRenderer.tsx` — Split multi-content blocks with dividers
 
-### 6. Update `src/components/chat/ListingCard.tsx`
-- Add `CardActions` at bottom for consistency
+Update the renderer to detect when content contains **multiple** content types (e.g., intro text + social post + email) and split them with `<Separator />` dividers:
+- Split content on `---` or double newlines between distinct content sections
+- Detect each section independently and render the appropriate card
+- Add `<Separator className="my-3" />` between sections
+- Wrap each card section in a div with `animate-fade-in-up` and staggered `animation-delay`
 
-## Props flow
-```text
-ChatPanel (sendMessage)
-  → ContentCardRenderer (onAction)
-    → SocialPostCard / EmailCard / ListingCard (onAction)
-      → CardActions (onAction)
-```
+### 3. `src/components/chat/SocialPostCard.tsx`, `EmailCard.tsx`, `ListingCard.tsx` — Add entrance animation
 
-## Files modified: 6
-- `src/components/chat/CardActions.tsx` (new)
-- `src/components/chat/SocialPostCard.tsx`
-- `src/components/chat/EmailCard.tsx`
-- `src/components/chat/ListingCard.tsx`
-- `src/components/chat/ContentCardRenderer.tsx`
-- `src/components/chat/ChatPanel.tsx`
+Wrap each card's root div with the `animate-fade-in-up` class (already defined in tailwind config).
 
-No database changes needed.
+### 4. New: `src/components/chat/EntityLinker.tsx` — Clickable entity names
+
+Small component that:
+- Receives `content` (ReactNode), `dealId`, `contactId`
+- Wraps the rendered output and adds click handlers on elements matching deal/contact patterns
+- Simpler implementation: just add small clickable badges below the message like `🏠 View deal` / `👤 View contact` when IDs are present, linking to `/deals?highlight=<id>` and `/contacts?highlight=<id>`
+
+## Files modified: 5
+- `src/components/chat/ChatPanel.tsx` — pill-styled tool indicators, entity ID tracking on messages, entity link badges
+- `src/components/chat/ContentCardRenderer.tsx` — multi-section splitting with dividers
+- `src/components/chat/SocialPostCard.tsx` — fade-in animation class
+- `src/components/chat/EmailCard.tsx` — fade-in animation class
+- `src/components/chat/ListingCard.tsx` — fade-in animation class
+
+No database or edge function changes needed.
 
