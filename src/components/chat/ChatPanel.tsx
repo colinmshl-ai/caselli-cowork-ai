@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useCallback, MutableRefObject } from "reac
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, ArrowUp, ChevronDown } from "lucide-react";
+import { Plus, ArrowUp, Clock, Search } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import ContentCardRenderer from "./ContentCardRenderer";
 
@@ -98,6 +100,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const [messages, setMessages] = useState<any[]>([]);
   const [typingStatus, setTypingStatus] = useState("");
   const [showConvos, setShowConvos] = useState(false);
+  const [convoSearch, setConvoSearch] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialized = useRef(false);
@@ -517,50 +520,81 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   return (
     <>
       {/* Top bar */}
-      <div className="border-b border-border px-4 py-3 flex items-center justify-between">
-        <button
-          onClick={startNewChat}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Plus size={16} />
-          <span>New Chat</span>
-        </button>
-
-        <div className="relative">
-          <button
-            onClick={() => setShowConvos(!showConvos)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            History
-            <ChevronDown size={14} className={`transition-transform ${showConvos ? "rotate-180" : ""}`} />
-          </button>
-
-          {showConvos && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowConvos(false)} />
-              <div className="absolute right-0 top-8 z-20 w-64 max-h-72 overflow-y-auto rounded-md border border-border bg-background shadow-sm">
-                {conversations.length === 0 ? (
-                  <p className="p-3 text-xs text-muted-foreground">No conversations yet</p>
-                ) : (
-                  conversations.map((c) => (
+      <div className="px-4 py-3.5 flex items-center justify-between shadow-sm relative z-10">
+        {/* History button — left */}
+        <Sheet open={showConvos} onOpenChange={(open) => { setShowConvos(open); if (!open) setConvoSearch(""); }}>
+          <SheetTrigger asChild>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                  <Clock size={16} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">History</TooltipContent>
+            </Tooltip>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-72 p-0">
+            <SheetHeader className="px-4 pt-4 pb-3 border-b border-border">
+              <SheetTitle className="text-sm font-semibold">Conversations</SheetTitle>
+              <div className="relative mt-2">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={convoSearch}
+                  onChange={(e) => setConvoSearch(e.target.value)}
+                  placeholder="Search conversations..."
+                  className="w-full rounded-md border border-border bg-transparent pl-8 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                />
+              </div>
+            </SheetHeader>
+            <div className="overflow-y-auto max-h-[calc(100vh-120px)]">
+              {conversations.length === 0 ? (
+                <p className="p-4 text-xs text-muted-foreground">No conversations yet</p>
+              ) : (
+                conversations
+                  .filter((c) => !convoSearch || (c.title || "").toLowerCase().includes(convoSearch.toLowerCase()))
+                  .map((c) => (
                     <button
                       key={c.id}
-                      onClick={() => loadConversation(c.id)}
-                      className={`w-full text-left px-3 py-2.5 text-xs border-b border-border last:border-0 hover:bg-secondary/50 transition-colors ${
+                      onClick={() => { loadConversation(c.id); setShowConvos(false); setConvoSearch(""); }}
+                      className={`w-full text-left px-4 py-3 border-b border-border last:border-0 hover:bg-secondary/50 transition-colors ${
                         c.id === activeConvoId ? "bg-secondary/50" : ""
                       }`}
                     >
-                      <span className="block text-foreground truncate">{c.title || "Untitled"}</span>
-                      <span className="text-muted-foreground">
+                      <span className="block text-sm text-foreground truncate">{c.title || "Untitled"}</span>
+                      <span className="text-xs text-muted-foreground">
                         {formatDistanceToNow(new Date(c.updated_at), { addSuffix: true })}
                       </span>
                     </button>
                   ))
-                )}
-              </div>
-            </>
-          )}
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Centered title */}
+        <div className="absolute left-1/2 -translate-x-1/2 max-w-[60%]">
+          {(() => {
+            const activeConvo = conversations.find((c) => c.id === activeConvoId);
+            const title = activeConvo?.title;
+            if (!title) return <span className="text-sm text-muted-foreground italic">New conversation</span>;
+            const truncated = title.length > 30 ? title.slice(0, 30) + "…" : title;
+            return <span className="text-sm font-medium text-foreground truncate block">{truncated}</span>;
+          })()}
         </div>
+
+        {/* New chat — right */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={startNewChat}
+              className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Plus size={16} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">New chat</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Messages */}
