@@ -322,6 +322,10 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           );
         }
 
+        // Invalidate activity panel queries
+        queryClient.invalidateQueries({ queryKey: ["activity-deals"] });
+        queryClient.invalidateQueries({ queryKey: ["activity-tasks"] });
+
         // Update conversation context
         if (toolsUsed.length > 0) {
           const ctx = parseConversationContext(toolsUsed);

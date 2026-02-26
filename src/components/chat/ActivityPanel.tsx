@@ -66,6 +66,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
       return data;
     },
     enabled: !!user,
+    refetchOnWindowFocus: true,
   });
 
   const { data: taskHistory = [] } = useQuery({
@@ -82,6 +83,8 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
       return data;
     },
     enabled: !!user,
+    refetchInterval: 10000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: focusedDeal } = useQuery({
@@ -243,11 +246,14 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           ) : (
             <div className="space-y-3">
               {taskHistory.map((t) => (
-                <div key={t.id} className="flex items-start justify-between gap-2">
-                  <p className="text-sm text-foreground leading-snug">{t.description || t.task_type}</p>
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0 mt-0.5">
-                    {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
-                  </span>
+                <div key={t.id} className="flex items-start gap-2.5">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground leading-snug truncate">{t.description || t.task_type}</p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
