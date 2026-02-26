@@ -248,7 +248,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
 
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
+              <h3 className="font-serif text-sm font-medium text-foreground shrink-0" style={{ fontFamily: "'Playfair Display', serif" }}>
                 {sectionTitle}
               </h3>
               <div className="flex-1 h-px bg-border" />
@@ -258,7 +258,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
                 <button
                   key={a.label}
                   onClick={() => onQuickAction(a.message)}
-                  className="flex w-full items-center justify-between text-left text-sm text-foreground bg-transparent hover:bg-secondary/50 rounded-lg min-h-[44px] px-3 py-2.5 transition-colors duration-150"
+                  className="flex w-full items-center justify-between text-left text-sm text-foreground bg-transparent hover:bg-secondary/50 rounded-lg min-h-[44px] min-w-[44px] px-3 py-2.5 transition-all duration-200"
                 >
                   <span>{a.label}</span>
                   <ChevronRight size={14} className="text-muted-foreground shrink-0" />
@@ -270,7 +270,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
 
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
+            <h3 className="font-serif text-sm font-medium text-foreground shrink-0" style={{ fontFamily: "'Playfair Display', serif" }}>
               Recent Activity
             </h3>
             <div className="flex-1 h-px bg-border" />

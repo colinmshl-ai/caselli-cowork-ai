@@ -107,15 +107,15 @@ const Deals = () => {
             <div className="flex rounded-md border border-border overflow-hidden">
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-2 transition-colors ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                title="List view"
+                className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all duration-200 ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                aria-label="List view"
               >
                 <LayoutList size={16} />
               </button>
               <button
                 onClick={() => setViewMode("board")}
-                className={`p-2 transition-colors ${viewMode === "board" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                title="Board view"
+                className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all duration-200 ${viewMode === "board" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                aria-label="Board view"
               >
                 <Columns3 size={16} />
               </button>
@@ -183,7 +183,7 @@ const Deals = () => {
               <button
                 key={deal.id}
                 onClick={() => openEdit(deal)}
-                className="w-full border-b border-border px-5 py-3.5 text-left transition-colors hover:bg-secondary/50 min-h-[44px]"
+                className="w-full border-b border-border px-5 py-3.5 text-left transition-all duration-200 hover:bg-secondary/50 min-h-[44px]"
               >
                 {/* Mobile */}
                 <div className="md:hidden">

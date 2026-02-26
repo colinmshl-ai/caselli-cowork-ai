@@ -18,6 +18,7 @@ const Chat = () => {
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const sendMessageRef = useRef<((msg: string) => void) | null>(null);
   const [conversationContext, setConversationContext] = useState<ConversationContext>({ topic: "general" });
+  const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     const prompt = searchParams.get("prompt");
@@ -25,6 +26,19 @@ const Chat = () => {
       setPendingPrompt(prompt);
     }
   }, [searchParams]);
+
+  // Cmd+K / Ctrl+K to focus chat input
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setActiveTab("chat");
+        chatTextareaRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   const handleQuickAction = useCallback((message: string) => {
     setActiveTab("chat");
@@ -72,6 +86,7 @@ const Chat = () => {
           onPromptConsumed={() => setPendingPrompt(null)}
           sendMessageRef={sendMessageRef}
           onConversationContext={setConversationContext}
+          textareaRef={chatTextareaRef}
         />
       </div>
 

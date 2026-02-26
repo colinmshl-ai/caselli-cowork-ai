@@ -33,10 +33,10 @@ const AppLayout = () => {
           {navItems.map(({ to, icon: Icon, label }) => (
             <Tooltip key={to}>
               <TooltipTrigger asChild>
-                <NavLink to={to} className="flex items-center justify-center">
+                <NavLink to={to} className="flex items-center justify-center min-w-[44px] min-h-[44px]" aria-label={label}>
                   <Icon
                     size={20}
-                    className={`transition-colors ${
+                    className={`transition-all duration-200 ${
                       isActive(to) ? "text-primary" : "text-muted-foreground hover:text-foreground"
                     }`}
                   />
@@ -65,7 +65,8 @@ const AppLayout = () => {
             <TooltipTrigger asChild>
               <button
                 onClick={signOut}
-                className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] text-muted-foreground hover:text-foreground transition-all duration-200"
+                aria-label="Sign out"
               >
                 <LogOut size={18} />
               </button>
@@ -89,10 +90,11 @@ const AppLayout = () => {
             key={to}
             to={to}
             className="flex flex-col items-center justify-center gap-1 min-h-[44px] min-w-[44px] py-1"
+            aria-label={label}
           >
             <Icon
               size={20}
-              className={`transition-colors ${
+              className={`transition-all duration-200 ${
                 isActive(to) ? "text-primary" : "text-muted-foreground"
               }`}
             />
