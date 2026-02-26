@@ -1,42 +1,49 @@
 
 
-# Contextual Typing Indicator
+# Rich Draft Content Cards in Chat
 
-## Changes
+## New Files
 
-### 1. Edge function: Add `tools_used` to response (`supabase/functions/chat/index.ts`)
+### 1. `src/components/chat/SocialPostCard.tsx`
+- Props: `platform: string`, `content: string`
+- Top bar with platform name (uppercase, tracking-wider, text-xs font-medium text-muted-foreground)
+- Body with post content (text-sm, whitespace-pre-wrap)
+- Bottom bar with character count (left) and Copy button (right)
+- Copy button: text-xs text-muted-foreground hover:text-foreground, uses clipboard API, toggles to "Copied!" for 2s
 
-- Create a `toolsUsed` array at the start of the tool loop
-- Define a description map: `get_active_deals` → "Looking up your deals...", etc.
-- Each time a tool_use block is processed, push `{ tool, description }` to the array
-- Include `tools_used` in the final JSON response alongside `response`
+### 2. `src/components/chat/EmailCard.tsx`
+- Props: `to: string`, `subject: string`, `body: string`
+- Header section with To and Subject fields
+- Body section with email content (leading-relaxed)
+- Bottom bar with Copy button
 
-### 2. ChatPanel: Dynamic typing status (`src/components/chat/ChatPanel.tsx`)
+### 3. `src/components/chat/ListingCard.tsx`
+- Props: `address: string`, `stats: string` (beds/baths/sqft line), `description: string`
+- Header with address and stats row (separated by middle dots)
+- Body with listing description
+- Bottom bar with Copy button
 
-- Replace `const [typing, setTyping] = useState(false)` with `const [typingStatus, setTypingStatus] = useState("")`
-- Update `TypingIndicator` to accept a `status: string` prop and render it
-- In `sendMessage`:
-  - Set `typingStatus("Thinking...")` before the edge function call
-  - After response arrives, if `tools_used` array is non-empty, sequentially flash each tool description for 600ms using a small async loop with `setTimeout`
-  - After all tool descriptions shown (or if none), clear `typingStatus("")` and display the response
-- Update render: show indicator when `typingStatus !== ""` instead of `typing`
-- Update auto-scroll dependency from `typing` to `typingStatus`
+### 4. `src/components/chat/ContentCardRenderer.tsx`
+- Takes full message `content: string`
+- Detection logic via regex:
+  - **Email**: contains `Subject:` AND (`To:` or `Dear ` or `Hi `)
+  - **Social**: contains `Instagram`/`Facebook`/`LinkedIn` AND a draft block
+  - **Listing**: contains `bed` AND `bath` AND address-like pattern
+- Splits content into "intro text" (before the draft) and "draft content"
+- Renders intro via `<ReactMarkdown>`, then the appropriate card component
+- Falls back to full `<ReactMarkdown>` if no pattern matches
 
-### Tool description map (edge function)
+## Modified File
 
-```
-get_active_deals       → "Looking up your deals..."
-get_deal_details       → "Pulling deal details..."
-update_deal            → "Updating your deal..."
-check_upcoming_deadlines → "Checking your deadlines..."
-create_deal            → "Creating a new deal..."
-draft_social_post      → "Drafting a social post..."
-draft_listing_description → "Writing a listing description..."
-draft_email            → "Drafting an email..."
-search_contacts        → "Searching your contacts..."
-add_contact            → "Adding a new contact..."
-update_contact         → "Updating contact info..."
-```
+### `src/components/chat/ChatPanel.tsx`
+- Import `ContentCardRenderer`
+- Replace lines 296-299 (the `<ReactMarkdown>` block for assistant messages) with `<ContentCardRenderer content={m.content} />`
+- All other code untouched
 
-**2 files modified. No database changes.**
+## Shared Card Styling
+- Container: `border border-border rounded-md overflow-hidden bg-background mt-3`
+- Sections separated by `border-b border-border` / `border-t border-border`
+- Padding: `px-4 py-2.5` for bars, `px-4 py-3` for body
+- No shadows, gradients, or decorative elements
+- Copy button reused across all three cards as a small inline component
 
