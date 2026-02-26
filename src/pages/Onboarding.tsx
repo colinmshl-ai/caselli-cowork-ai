@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +32,7 @@ const INTEGRATIONS = [
 const Onboarding = () => {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
@@ -54,12 +55,14 @@ const Onboarding = () => {
 
   useEffect(() => {
     if (!loading && user) {
+      if (savingRef.current) return;
       supabase
         .from("profiles")
         .select("onboarding_completed")
         .eq("id", user.id)
         .single()
         .then(({ data }) => {
+          if (savingRef.current) return;
           if (data?.onboarding_completed) {
             navigate("/chat", { replace: true });
           }
@@ -75,47 +78,57 @@ const Onboarding = () => {
 
   const handleFinish = async () => {
     if (!user) return;
+    savingRef.current = true;
     setSaving(true);
 
-    const { error: bpError } = await supabase.from("business_profiles").upsert({
-      user_id: user.id,
-      business_name: businessName || null,
-      brokerage_name: brokerageName || null,
-      market_area: marketArea || null,
-      specialties: specialties.length > 0 ? specialties : null,
-      team_size: teamSize || null,
-      preferred_title_company: titleCompany || null,
-      preferred_inspector: inspector || null,
-      preferred_photographer: photographer || null,
-      preferred_lender: lender || null,
-      brand_tone: brandTone,
-      brand_voice_notes: brandVoiceNotes || null,
-    });
+    try {
+      const { error: bpError } = await supabase.from("business_profiles").upsert({
+        user_id: user.id,
+        business_name: businessName || null,
+        brokerage_name: brokerageName || null,
+        market_area: marketArea || null,
+        specialties: specialties.length > 0 ? specialties : null,
+        team_size: teamSize || null,
+        preferred_title_company: titleCompany || null,
+        preferred_inspector: inspector || null,
+        preferred_photographer: photographer || null,
+        preferred_lender: lender || null,
+        brand_tone: brandTone,
+        brand_voice_notes: brandVoiceNotes || null,
+      });
 
-    if (bpError) {
-      toast.error("Failed to save business profile");
+      if (bpError) {
+        toast.error("Failed to save business profile: " + bpError.message);
+        savingRef.current = false;
+        setSaving(false);
+        return;
+      }
+
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 14);
+
+      const { error: pError } = await supabase
+        .from("profiles")
+        .update({
+          onboarding_completed: true,
+          trial_ends_at: trialEnd.toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (pError) {
+        toast.error("Failed to update profile: " + pError.message);
+        savingRef.current = false;
+        setSaving(false);
+        return;
+      }
+
+      await new Promise((r) => setTimeout(r, 100));
+      navigate("/chat", { replace: true });
+    } catch (err) {
+      toast.error("An unexpected error occurred. Please try again.");
+      savingRef.current = false;
       setSaving(false);
-      return;
     }
-
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 14);
-
-    const { error: pError } = await supabase
-      .from("profiles")
-      .update({
-        onboarding_completed: true,
-        trial_ends_at: trialEnd.toISOString(),
-      })
-      .eq("id", user.id);
-
-    if (pError) {
-      toast.error("Failed to update profile");
-      setSaving(false);
-      return;
-    }
-
-    navigate("/chat", { replace: true });
   };
 
   const inputClass =
