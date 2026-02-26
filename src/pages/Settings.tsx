@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sun, Moon, Monitor } from "lucide-react";
 
 const SPECIALTIES_OPTIONS = [
   "Residential",
@@ -62,6 +63,29 @@ const Settings = () => {
 
   const [saving, setSaving] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
+
+  // Theme
+  const [theme, setTheme] = useState<"light" | "dark" | "system">(() => {
+    return (localStorage.getItem("theme") as "light" | "dark" | "system") || "system";
+  });
+
+  const applyTheme = useCallback((value: "light" | "dark" | "system") => {
+    setTheme(value);
+    localStorage.setItem("theme", value);
+    const isDark =
+      value === "dark" || (value === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.toggle("dark", isDark);
+  }, []);
+
+  useEffect(() => {
+    applyTheme(theme);
+    if (theme === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = () => applyTheme("system");
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
+    }
+  }, [theme, applyTheme]);
 
   useEffect(() => {
     if (!user) return;
@@ -271,6 +295,30 @@ const Settings = () => {
               )
             }
           />
+        </Section>
+
+        {/* Theme */}
+        <Section title="Theme">
+          <div className="flex gap-2">
+            {([
+              { value: "light", label: "Light", icon: Sun },
+              { value: "dark", label: "Dark", icon: Moon },
+              { value: "system", label: "System", icon: Monitor },
+            ] as const).map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                onClick={() => applyTheme(value)}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2.5 min-h-[44px] text-sm font-medium transition-colors border ${
+                  theme === value
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <Icon size={16} />
+                {label}
+              </button>
+            ))}
+          </div>
         </Section>
 
         {/* Connected Tools */}
