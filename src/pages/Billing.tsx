@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Navigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 const PLANS = [
   {
@@ -52,6 +53,19 @@ const Billing = () => {
   const { session, loading } = useAuth();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
+  const { data: profile } = useQuery({
+    queryKey: ["billing-profile", session?.user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", session!.user.id)
+        .single();
+      return data;
+    },
+    enabled: !!session?.user,
+  });
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -94,7 +108,9 @@ const Billing = () => {
           <h2 className="text-3xl font-semibold text-foreground mt-8 mb-3">Choose your plan</h2>
           <p className="text-muted-foreground">14-day free trial included with every plan</p>
           <div className="mt-4 flex items-center justify-center gap-4">
-            <a href="/chat" className="text-sm text-primary hover:opacity-70 transition-opacity">← Back to app</a>
+            {profile?.onboarding_completed && (
+              <a href="/chat" className="text-sm text-primary hover:opacity-70 transition-opacity">← Back to app</a>
+            )}
             <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sign out</button>
           </div>
         </div>
