@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Copy, Check } from "lucide-react";
 
 const CopyButton = ({ text }: { text: string }) => {
   const [copied, setCopied] = useState(false);
@@ -12,9 +13,19 @@ const CopyButton = ({ text }: { text: string }) => {
   return (
     <button
       onClick={handleCopy}
-      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
     >
-      {copied ? "Copied!" : "Copy"}
+      {copied ? (
+        <>
+          <Check size={14} className="text-primary" />
+          <span>Copied</span>
+        </>
+      ) : (
+        <>
+          <Copy size={14} />
+          <span>Copy</span>
+        </>
+      )}
     </button>
   );
 };
