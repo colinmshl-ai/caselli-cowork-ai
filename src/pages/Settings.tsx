@@ -18,10 +18,10 @@ const SPECIALTIES_OPTIONS = [
 ];
 
 const TONE_OPTIONS = [
-  { value: "professional", label: "Professional" },
-  { value: "friendly", label: "Friendly" },
-  { value: "luxury", label: "Luxury" },
-  { value: "casual", label: "Casual" },
+  { value: "professional", label: "Professional & Polished" },
+  { value: "friendly", label: "Friendly & Approachable" },
+  { value: "luxury", label: "Luxury & Elevated" },
+  { value: "casual", label: "Casual & Personable" },
   { value: "authoritative", label: "Authoritative" },
 ];
 
