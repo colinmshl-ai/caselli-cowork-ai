@@ -58,7 +58,7 @@ const SocialPostCard = ({ platform, content, onAction }: SocialPostCardProps) =>
   );
 
   return (
-    <div className="border border-border rounded-md overflow-hidden bg-background mt-3">
+    <div className="border border-border rounded-md overflow-hidden bg-background mt-3 animate-fade-in-up">
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">

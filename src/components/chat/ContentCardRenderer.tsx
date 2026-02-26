@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import SocialPostCard from "./SocialPostCard";
 import EmailCard from "./EmailCard";
 import ListingCard from "./ListingCard";
+import { Separator } from "@/components/ui/separator";
 
 interface ContentCardRendererProps {
   content: string;
@@ -60,14 +61,11 @@ function parseSocial(content: string) {
   const platformMatch = content.match(/\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b/i);
   const platform = platformMatch?.[1] || "Social";
 
-  // Try to split on common patterns like "---", triple backticks, or "Here's" intro
-  // Look for a block that starts after a colon or newline following the intro
   const lines = content.split("\n");
   let splitIdx = -1;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    // Detect start of draft block: line after "draft", "post", "caption" mention with colon
     if (/(:|\bhere'?s?\b)/i.test(line) && /draft|post|caption/i.test(line)) {
       splitIdx = i;
       break;
@@ -75,14 +73,12 @@ function parseSocial(content: string) {
   }
 
   if (splitIdx === -1) {
-    // Fallback: first line is intro, rest is content
     return { intro: lines[0], platform, postContent: lines.slice(1).join("\n").trim() };
   }
 
   const intro = lines.slice(0, splitIdx + 1).join("\n").trim();
   let postContent = lines.slice(splitIdx + 1).join("\n").trim();
 
-  // Clean markdown artifacts
   postContent = postContent
     .replace(/^["`\*]+|["`\*]+$/g, "")
     .replace(/\*\*(.+?)\*\*/g, "$1")
@@ -94,7 +90,6 @@ function parseSocial(content: string) {
 function parseListing(content: string) {
   const lines = content.split("\n");
 
-  // Try to find address line (usually has a number followed by street name)
   let address = "";
   let statsLine = "";
   let descStart = 0;
@@ -102,14 +97,12 @@ function parseListing(content: string) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    // Address pattern: starts with number, has street-like words
     if (!address && /^\d+\s+\w+/.test(line)) {
       address = line.replace(/[*#]+/g, "").trim();
       descStart = i + 1;
       introEnd = i;
       continue;
     }
-    // Stats line with bed/bath
     if (address && /\bbed/i.test(line) && /\bbath/i.test(line)) {
       statsLine = line.replace(/[*#-]+/g, "").trim();
       descStart = i + 1;
@@ -118,7 +111,6 @@ function parseListing(content: string) {
   }
 
   if (!address) {
-    // Fallback: use first line mentioning bed/bath context
     address = "Property";
     const bedBathLine = lines.find((l) => /\bbed/i.test(l) && /\bbath/i.test(l));
     if (bedBathLine) {
@@ -134,9 +126,21 @@ function parseListing(content: string) {
   return { intro, address, stats: statsLine, description };
 }
 
-const ContentCardRenderer = ({ content, onAction }: ContentCardRendererProps) => {
-  if (detectEmail(content)) {
-    const { intro, to, subject, body } = parseEmail(content);
+/** Split content into sections on "---" horizontal rules */
+function splitSections(content: string): string[] {
+  const parts = content.split(/\n---+\n/);
+  // Also split on triple-newline boundaries between distinct content types
+  const result: string[] = [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed) result.push(trimmed);
+  }
+  return result.length > 0 ? result : [content];
+}
+
+function renderSection(section: string, onAction?: (message: string) => void) {
+  if (detectEmail(section)) {
+    const { intro, to, subject, body } = parseEmail(section);
     return (
       <>
         {intro && (
@@ -149,8 +153,8 @@ const ContentCardRenderer = ({ content, onAction }: ContentCardRendererProps) =>
     );
   }
 
-  if (detectSocial(content)) {
-    const { intro, platform, postContent } = parseSocial(content);
+  if (detectSocial(section)) {
+    const { intro, platform, postContent } = parseSocial(section);
     return (
       <>
         {intro && (
@@ -163,8 +167,8 @@ const ContentCardRenderer = ({ content, onAction }: ContentCardRendererProps) =>
     );
   }
 
-  if (detectListing(content)) {
-    const { intro, address, stats, description } = parseListing(content);
+  if (detectListing(section)) {
+    const { intro, address, stats, description } = parseListing(section);
     return (
       <>
         {intro && (
@@ -177,10 +181,33 @@ const ContentCardRenderer = ({ content, onAction }: ContentCardRendererProps) =>
     );
   }
 
-  // Fallback: plain markdown
+  // Plain markdown
   return (
     <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
-      <ReactMarkdown>{content}</ReactMarkdown>
+      <ReactMarkdown>{section}</ReactMarkdown>
+    </div>
+  );
+}
+
+const ContentCardRenderer = ({ content, onAction }: ContentCardRendererProps) => {
+  const sections = splitSections(content);
+
+  if (sections.length === 1) {
+    return <>{renderSection(sections[0], onAction)}</>;
+  }
+
+  return (
+    <div className="space-y-0">
+      {sections.map((section, i) => (
+        <div
+          key={i}
+          className="animate-fade-in-up"
+          style={{ animationDelay: `${i * 100}ms` }}
+        >
+          {i > 0 && <Separator className="my-3" />}
+          {renderSection(section, onAction)}
+        </div>
+      ))}
     </div>
   );
 };
