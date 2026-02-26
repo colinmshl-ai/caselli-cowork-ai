@@ -549,7 +549,7 @@ RULES:
                 "content-type": "application/json",
               },
               body: JSON.stringify({
-                model: "claude-sonnet-4-5-20241022",
+                model: "claude-sonnet-4-5-20250929",
                 system: systemPrompt,
                 messages: currentMessages,
                 tools: TOOLS,
@@ -603,7 +603,10 @@ RULES:
               const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
               for (const tool of iterationToolCalls) {
                 const desc = TOOL_DESCRIPTIONS[tool.name] || "Working on it...";
-                toolsUsed.push({ tool: tool.name, description: desc });
+                const toolEntry: { tool: string; description: string; deal_id?: string; contact_id?: string } = { tool: tool.name, description: desc };
+                if (tool.input?.deal_id) toolEntry.deal_id = tool.input.deal_id;
+                if (tool.input?.contact_id) toolEntry.contact_id = tool.input.contact_id;
+                toolsUsed.push(toolEntry);
                 sendSSE(controller, "tool_status", { tool: tool.name, status: desc });
 
                 const { result, taskType, taskDescription } = await executeTool(
@@ -663,7 +666,7 @@ RULES:
                   "content-type": "application/json",
                 },
                 body: JSON.stringify({
-                  model: "claude-sonnet-4-5-20241022",
+                  model: "claude-sonnet-4-5-20250929",
                   system: "You extract important facts from conversations. Return ONLY a JSON array.",
                   messages: [{
                     role: "user",
