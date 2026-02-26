@@ -656,13 +656,13 @@ MULTI-ACTION BEHAVIOR:
                   lastCreatedContactId = (result[0] as Record<string, unknown>).id as string;
                 }
 
-                // Log to task_history (non-blocking)
-                adminClient.from("task_history").insert({
+                // Log to task_history
+                await adminClient.from("task_history").insert({
                   user_id: userId,
                   task_type: taskType,
                   description: taskDescription,
                   metadata: { tool: tool.name, input: tool.input },
-                });
+                }).then(({ error }) => { if (error) console.error("task_history insert error:", error); });
 
                 toolResults.push({
                   type: "tool_result",
