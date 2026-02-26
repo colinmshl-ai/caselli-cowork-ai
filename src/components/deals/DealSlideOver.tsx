@@ -1,22 +1,17 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { X } from "lucide-react";
+import { X, Mail, Share2, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 const STAGE_OPTIONS = [
@@ -40,41 +35,19 @@ interface DealSlideOverProps {
 const inputClass =
   "w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground";
 
-function DateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const dateValue = value ? new Date(value + "T00:00:00") : undefined;
-
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground mb-1 block">{label}</label>
       <Popover>
         <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              inputClass,
-              "text-left",
-              !value && "text-muted-foreground"
-            )}
-          >
+          <button type="button" className={cn(inputClass, "text-left", !value && "text-muted-foreground")}>
             {dateValue ? format(dateValue, "MMM d, yyyy") : "Select date"}
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={dateValue}
-            onSelect={(d) => onChange(d ? format(d, "yyyy-MM-dd") : "")}
-            initialFocus
-            className="p-3 pointer-events-auto"
-          />
+          <Calendar mode="single" selected={dateValue} onSelect={(d) => onChange(d ? format(d, "yyyy-MM-dd") : "")} initialFocus className="p-3 pointer-events-auto" />
         </PopoverContent>
       </Popover>
     </div>
@@ -83,7 +56,9 @@ function DateField({
 
 const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOverProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
+  const [addressError, setAddressError] = useState(false);
 
   const [propertyAddress, setPropertyAddress] = useState("");
   const [clientName, setClientName] = useState("");
@@ -98,6 +73,24 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
   const [financingDeadline, setFinancingDeadline] = useState("");
   const [appraisalDeadline, setAppraisalDeadline] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Fetch activity for this deal
+  const { data: activities = [] } = useQuery({
+    queryKey: ["deal-activity", deal?.id],
+    queryFn: async () => {
+      if (!deal?.id || !user) return [];
+      const { data, error } = await supabase
+        .from("task_history")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return [];
+      // Filter by deal_id in metadata client-side
+      return (data || []).filter((t: any) => t.metadata?.deal_id === deal.id);
+    },
+    enabled: !!deal?.id && !!user && open,
+  });
 
   useEffect(() => {
     if (deal) {
@@ -120,17 +113,18 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
       setClosingDate(""); setInspectionDeadline(""); setFinancingDeadline("");
       setAppraisalDeadline(""); setNotes("");
     }
+    setAddressError(false);
   }, [deal, open]);
 
   const handleSave = async () => {
     if (!user) return;
     if (!propertyAddress.trim()) {
+      setAddressError(true);
       toast.error("Property address is required");
       return;
     }
 
     setSaving(true);
-
     const payload = {
       user_id: user.id,
       property_address: propertyAddress.trim(),
@@ -164,14 +158,15 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
     setSaving(false);
   };
 
+  const quickAction = (prompt: string) => {
+    navigate(`/chat?prompt=${encodeURIComponent(prompt)}`);
+  };
+
   return (
     <>
       {/* Overlay */}
       <div
-        className={cn(
-          "fixed inset-0 z-40 bg-foreground/10 transition-opacity duration-200",
-          open ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}
+        className={cn("fixed inset-0 z-40 bg-foreground/10 transition-opacity duration-200", open ? "opacity-100" : "opacity-0 pointer-events-none")}
         onClick={onClose}
       />
 
@@ -186,16 +181,43 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
           <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
         </div>
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="text-sm font-semibold text-foreground">
-            {deal ? "Edit Deal" : "New Deal"}
-          </h2>
+          <h2 className="text-sm font-semibold text-foreground">{deal ? "Edit Deal" : "New Deal"}</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X size={18} />
           </button>
         </div>
 
+        {/* Quick actions when editing */}
+        {deal && (
+          <div className="flex gap-2 px-5 py-3 border-b border-border">
+            <button
+              onClick={() => quickAction(`Draft a follow-up email to ${deal.client_name || "my client"} about the property at ${deal.property_address}`)}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+            >
+              <Mail size={12} /> Draft email
+            </button>
+            <button
+              onClick={() => quickAction(`Create a social media post for the listing at ${deal.property_address}`)}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+            >
+              <Share2 size={12} /> Social post
+            </button>
+          </div>
+        )}
+
         <div className="space-y-4 px-5 py-5">
-          <input type="text" placeholder="Property address *" value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} className={inputClass} />
+          {/* Address with validation */}
+          <div>
+            <input
+              type="text"
+              placeholder="Property address *"
+              value={propertyAddress}
+              onChange={(e) => { setPropertyAddress(e.target.value); if (e.target.value.trim()) setAddressError(false); }}
+              onBlur={() => { if (!propertyAddress.trim()) setAddressError(true); }}
+              className={cn(inputClass, addressError && "border-destructive")}
+            />
+            {addressError && <p className="text-xs text-destructive mt-1">Property address is required</p>}
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input type="text" placeholder="Client name" value={clientName} onChange={(e) => setClientName(e.target.value)} className={inputClass} />
@@ -208,28 +230,18 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Deal type</label>
             <div className="flex rounded-md border border-border overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setDealType("buyer")}
-                className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                  dealType === "buyer"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Buyer
-              </button>
-              <button
-                type="button"
-                onClick={() => setDealType("seller")}
-                className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                  dealType === "seller"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Seller
-              </button>
+              {(["buyer", "seller"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setDealType(t)}
+                  className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                    dealType === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -237,9 +249,7 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Stage</label>
             <select value={stage} onChange={(e) => setStage(e.target.value)} className={inputClass}>
-              {STAGE_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
+              {STAGE_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
 
@@ -289,9 +299,7 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
             <div className="pt-4 border-t border-border">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <button className="text-sm text-destructive hover:opacity-70 transition-opacity">
-                    Delete this deal
-                  </button>
+                  <button className="text-sm text-destructive hover:opacity-70 transition-opacity">Delete this deal</button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
@@ -302,15 +310,31 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => onDelete(deal.id)}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
+                    <AlertDialogAction onClick={() => onDelete(deal.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                       Delete
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+            </div>
+          )}
+
+          {/* Activity timeline */}
+          {deal && activities.length > 0 && (
+            <div className="pt-4 border-t border-border">
+              <h3 className="text-xs font-semibold text-foreground mb-3 flex items-center gap-1.5">
+                <Clock size={12} /> Activity
+              </h3>
+              <div className="space-y-2">
+                {activities.map((a: any) => (
+                  <div key={a.id} className="flex gap-2 text-xs">
+                    <span className="text-muted-foreground whitespace-nowrap">
+                      {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                    <span className="text-foreground">{a.description || a.task_type}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
