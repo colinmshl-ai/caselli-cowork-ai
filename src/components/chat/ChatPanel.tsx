@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, ArrowUp, ChevronDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import ReactMarkdown from "react-markdown";
 
 interface ChatPanelProps {
   pendingPrompt: string | null;
@@ -13,17 +14,14 @@ interface ChatPanelProps {
 
 const TypingIndicator = () => (
   <div className="flex items-center gap-1 px-2 py-1">
-    <div className="flex items-center gap-0.5">
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 animate-bounce"
-          style={{ animationDelay: `${i * 150}ms`, animationDuration: "0.8s" }}
-        />
-      ))}
-    </div>
+    <span className="text-sm text-muted-foreground animate-pulse">
+      Caselli is thinking…
+    </span>
   </div>
 );
+
+const WELCOME_TEMPLATE = (firstName: string) =>
+  `Hey ${firstName}! I'm Caselli, your AI coworker. I've reviewed your business profile and I'm ready to help. Here are a few things I can do right now:\n\n- **Draft social media posts** for your listings\n- **Track your deals** and flag upcoming deadlines\n- **Write emails** in your voice to clients and vendors\n- **Manage your contacts** and follow-up reminders\n\nWhat would you like to tackle first?`;
 
 const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPanelProps) => {
   const { user } = useAuth();
@@ -36,9 +34,10 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialized = useRef(false);
+  const welcomeSent = useRef(false);
 
   // Fetch conversations
-  const { data: conversations = [] } = useQuery({
+  const { data: conversations = [], isSuccess: convosLoaded } = useQuery({
     queryKey: ["conversations"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -51,13 +50,53 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
     enabled: !!user,
   });
 
-  // Load most recent conversation on mount
+  // Load most recent conversation on mount OR send welcome message
   useEffect(() => {
-    if (!initialized.current && conversations.length > 0 && !activeConvoId) {
+    if (!convosLoaded || !user || initialized.current) return;
+
+    if (conversations.length > 0) {
       initialized.current = true;
       loadConversation(conversations[0].id);
+    } else if (!welcomeSent.current) {
+      welcomeSent.current = true;
+      initialized.current = true;
+      sendWelcomeMessage();
     }
-  }, [conversations]);
+  }, [convosLoaded, conversations, user]);
+
+  const sendWelcomeMessage = async () => {
+    if (!user) return;
+
+    // Fetch first name from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+
+    const fullName = profile?.full_name || "";
+    const firstName = fullName.split(" ")[0] || "there";
+
+    // Create welcome conversation
+    const { data: convo, error: convoErr } = await supabase
+      .from("conversations")
+      .insert({ user_id: user.id, title: "Welcome" })
+      .select()
+      .single();
+    if (convoErr || !convo) return;
+
+    // Insert welcome message
+    const welcomeContent = WELCOME_TEMPLATE(firstName);
+    const { data: msg } = await supabase
+      .from("messages")
+      .insert({ conversation_id: convo.id, role: "assistant", content: welcomeContent })
+      .select()
+      .single();
+
+    setActiveConvoId(convo.id);
+    if (msg) setMessages([msg]);
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  };
 
   // Auto-scroll
   useEffect(() => {
@@ -247,7 +286,13 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
                   : "max-w-[85%] text-foreground"
               }`}
             >
-              <p className="whitespace-pre-wrap">{m.content}</p>
+              {m.role === "assistant" ? (
+                <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+                  <ReactMarkdown>{m.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap">{m.content}</p>
+              )}
             </div>
           </div>
         ))}
