@@ -644,8 +644,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       )}
 
       {/* Input */}
-      <div className="sticky bottom-0 z-10 bg-background px-4 py-3 pb-safe">
-        <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 shadow-sm transition-shadow focus-within:ring-1 focus-within:ring-ring">
+      <div className="sticky bottom-0 z-10 bg-background px-4 py-3 pb-safe border-t border-border">
+        <div className="flex items-end gap-2 rounded-2xl border border-transparent bg-secondary/50 px-5 py-3 transition-all focus-within:border-border focus-within:bg-card">
           <textarea
             ref={textareaRef}
             value={input}
@@ -653,17 +653,16 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
             onKeyDown={handleKeyDown}
             placeholder="Ask Caselli Cowork anything..."
             rows={1}
-            className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none max-h-[120px]"
+            className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none max-h-[120px] min-h-[44px] md:min-h-0"
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
+            className={`flex h-9 w-9 shrink-0 items-center justify-center transition-colors ${input.trim() ? "text-primary" : "text-muted-foreground"}`}
           >
-            <ArrowUp size={16} />
+            <ArrowUp size={20} />
           </button>
         </div>
-        <p className="text-[10px] text-muted-foreground text-center mt-1.5">Press Enter to send · Shift+Enter for new line</p>
       </div>
     </>
   );
