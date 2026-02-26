@@ -311,7 +311,7 @@ const Settings = () => {
                 });
               }
             }}
-            className="mt-4 rounded-md border border-border px-4 min-h-[44px] py-2.5 text-sm text-foreground hover:bg-secondary/50 transition-colors"
+            className="mt-4 w-full md:w-auto rounded-md border border-border px-4 min-h-[44px] py-2.5 text-sm text-foreground hover:bg-secondary/50 transition-colors"
           >
             Manage Subscription
           </button>
@@ -367,7 +367,7 @@ const SaveBtn = ({ loading, onClick }: { loading: boolean; onClick: () => void }
   <button
     onClick={onClick}
     disabled={loading}
-    className="mt-2 rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+    className="mt-2 w-full md:w-auto rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
   >
     {loading ? "Saving..." : "Save"}
   </button>
