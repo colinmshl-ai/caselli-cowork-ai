@@ -1,17 +1,24 @@
 
 
-# Bug Fix: Onboarding Step 5 "Start Working" resets to Step 1
+# Upgrade System Prompt for Proactive Agentic Behavior
 
-## Root Cause
-The `useEffect` (lines 55-68) re-queries the profile on every render. When `handleFinish` calls `setSaving(true)`, it triggers a re-render, the useEffect fires again, and the async profile check can interfere with the save flow — potentially resetting component state before `navigate("/chat")` executes.
+## Changes — `supabase/functions/chat/index.ts` only
 
-## Changes — `src/pages/Onboarding.tsx` only
+### 1. Replace YOUR PERSONALITY section (lines 492-498)
+Expand to "YOUR PERSONALITY AND BEHAVIOR" with proactive coworker directives: suggest next steps after every task, offer follow-up actions when creating deals or drafting content, flag deadlines within 48 hours, mention stale deal stages.
 
-1. **Add `useRef` import** and create `savingRef` to guard the useEffect during save
-2. **Guard the useEffect**: add `if (savingRef.current) return;` at the top of the effect body
-3. **Set `savingRef.current = true`** at the start of `handleFinish` (before `setSaving(true)`)
-4. **Wrap calls in try/catch** for safer error handling with specific error messages
-5. **Add small delay before navigate** to ensure the profile update has committed before navigation fires
+### 2. Replace YOUR CAPABILITIES section (lines 499-508)
+Expand to "YOUR CAPABILITIES AND HOW TO USE THEM" with proactive tool usage instructions: auto-search contacts when names are mentioned, check for existing deals when addresses are mentioned, chain related actions together (create deal + add contact + offer social post), auto-populate email recipients from contacts.
 
-No styling, layout, or other file changes.
+### 3. Replace RULES section (lines 509-514)
+Expand with additional directives: use tools proactively without waiting to be asked, think "what would a great assistant do next?" after every response, never give minimal answers.
+
+### 4. Update model identifier (line 552)
+Change `claude-sonnet-4-5-20250929` → `claude-sonnet-4-5-20250514`
+
+### 5. Increase max_tokens (line 556)
+Change `2048` → `4096`
+
+## Files Modified: 1
+- `supabase/functions/chat/index.ts`
 
