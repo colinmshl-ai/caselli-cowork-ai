@@ -60,37 +60,39 @@ const Settings = () => {
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
 
   const [saving, setSaving] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
-    // Load profile
-    supabase.from("profiles").select("*").eq("id", user.id).single().then(({ data }) => {
-      if (data) {
-        setFullName(data.full_name || "");
-        setPlanTier(data.plan_tier || "solo");
-        setSubStatus(data.subscription_status || "trial");
-        setTrialEndsAt(data.trial_ends_at);
+    setDataLoading(true);
+    Promise.all([
+      supabase.from("profiles").select("*").eq("id", user.id).single(),
+      supabase.from("business_profiles").select("*").eq("user_id", user.id).single(),
+    ]).then(([profileRes, bizRes]) => {
+      if (profileRes.data) {
+        setFullName(profileRes.data.full_name || "");
+        setPlanTier(profileRes.data.plan_tier || "solo");
+        setSubStatus(profileRes.data.subscription_status || "trial");
+        setTrialEndsAt(profileRes.data.trial_ends_at);
       }
-    });
-    // Load business profile
-    supabase.from("business_profiles").select("*").eq("user_id", user.id).single().then(({ data }) => {
-      if (data) {
+      if (bizRes.data) {
         setBiz({
-          business_name: data.business_name || "",
-          brokerage_name: data.brokerage_name || "",
-          market_area: data.market_area || "",
-          team_size: data.team_size || "",
-          specialties: data.specialties || [],
+          business_name: bizRes.data.business_name || "",
+          brokerage_name: bizRes.data.brokerage_name || "",
+          market_area: bizRes.data.market_area || "",
+          team_size: bizRes.data.team_size || "",
+          specialties: bizRes.data.specialties || [],
         });
-        setBrandTone(data.brand_tone || "professional");
-        setBrandNotes(data.brand_voice_notes || "");
+        setBrandTone(bizRes.data.brand_tone || "professional");
+        setBrandNotes(bizRes.data.brand_voice_notes || "");
         setVendors({
-          preferred_title_company: data.preferred_title_company || "",
-          preferred_inspector: data.preferred_inspector || "",
-          preferred_photographer: data.preferred_photographer || "",
-          preferred_lender: data.preferred_lender || "",
+          preferred_title_company: bizRes.data.preferred_title_company || "",
+          preferred_inspector: bizRes.data.preferred_inspector || "",
+          preferred_photographer: bizRes.data.preferred_photographer || "",
+          preferred_lender: bizRes.data.preferred_lender || "",
         });
       }
+      setDataLoading(false);
     });
   }, [user]);
 
@@ -119,6 +121,14 @@ const Settings = () => {
       : subStatus;
 
   if (!user) return null;
+
+  if (dataLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">

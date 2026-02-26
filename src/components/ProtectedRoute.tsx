@@ -11,7 +11,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     queryFn: async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("subscription_status, trial_ends_at, plan_tier")
+        .select("subscription_status, trial_ends_at, plan_tier, onboarding_completed")
         .eq("id", user!.id)
         .single();
       return data;
@@ -29,6 +29,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!session) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Check onboarding
+  if (profile && !profile.onboarding_completed) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   // Check subscription status

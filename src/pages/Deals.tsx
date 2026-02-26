@@ -60,9 +60,11 @@ const Deals = () => {
   const { data: deals = [], isLoading } = useQuery({
     queryKey: ["deals", filter],
     queryFn: async () => {
+      if (!user) throw new Error("Not authenticated");
       let query = supabase
         .from("deals")
         .select("*")
+        .eq("user_id", user.id)
         .order("closing_date", { ascending: true, nullsFirst: false });
 
       if (filter !== "all") {

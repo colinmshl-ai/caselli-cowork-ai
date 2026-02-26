@@ -77,7 +77,7 @@ const Onboarding = () => {
     if (!user) return;
     setSaving(true);
 
-    const { error: bpError } = await supabase.from("business_profiles").insert({
+    const { error: bpError } = await supabase.from("business_profiles").upsert({
       user_id: user.id,
       business_name: businessName || null,
       brokerage_name: brokerageName || null,

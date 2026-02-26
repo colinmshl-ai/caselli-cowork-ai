@@ -35,9 +35,11 @@ const Contacts = () => {
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["contacts"],
     queryFn: async () => {
+      if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
         .from("contacts")
         .select("*")
+        .eq("user_id", user.id)
         .order("full_name", { ascending: true });
       if (error) throw error;
       return data;

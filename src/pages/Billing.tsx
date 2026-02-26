@@ -81,6 +81,10 @@ const Billing = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-4xl px-6 py-16">
@@ -89,6 +93,10 @@ const Billing = () => {
           <h1 className="text-2xl font-bold tracking-tight text-foreground mb-2">Caselli</h1>
           <h2 className="text-3xl font-semibold text-foreground mt-8 mb-3">Choose your plan</h2>
           <p className="text-muted-foreground">14-day free trial included with every plan</p>
+          <div className="mt-4 flex items-center justify-center gap-4">
+            <a href="/chat" className="text-sm text-primary hover:opacity-70 transition-opacity">← Back to app</a>
+            <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sign out</button>
+          </div>
         </div>
 
         {/* Plans */}
