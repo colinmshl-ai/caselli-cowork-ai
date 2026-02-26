@@ -1,30 +1,40 @@
 
 
-# Add Follow-Up Suggestion Chips Below AI Responses
+# Improve AI Context Memory Within and Across Conversations
+
+## Current State
+- **Within conversation**: Message history is sent, but tool results (the actual data) are only logged, not included in the prompt. The AI sees `[Used create_deal]` but not the deal details, so it can't reference "that post" or "the same listing."
+- **Across conversations**: Welcome message fetches deals and last 5 tasks but presents a generic briefing — doesn't name the last conversation's specific work.
+- **Memory extraction**: Already uses `claude-sonnet-4-20250514` — no change needed.
 
 ## Changes
 
-### 1. New file: `src/components/chat/SuggestionChips.tsx`
-Component that maps a conversation context (last tool used, topic) to 2-3 contextual suggestion chips:
+### 1. Edge function: Enrich within-conversation context (`supabase/functions/chat/index.ts`)
 
-- **Deal created** (`create_deal`): "Draft listing description", "Create social media campaign", "Set up deadline alerts"
-- **Social post drafted** (`draft_social_post`): "Adapt for Facebook", "Write a matching email blast", "Create a LinkedIn version"
-- **Email drafted** (`draft_email`): "Draft a follow-up for next week", "Create a phone script version", "Add recipient to contacts"
-- **Pipeline/overview** (`get_deals`, topic=deals): "Update deal stages", "Draft status emails to all clients", "Review this week's deadlines"
-- **Contact added** (`add_contact`): "Draft intro email", "Create a deal for this contact"
-- **General fallback**: "Show my active deals", "Draft a social post", "Check this week's deadlines"
+Update the message history builder (lines 536-546) to include tool call inputs AND summarized results in assistant messages, not just tool names:
 
-Style: `border border-border rounded-full px-3 py-1.5 text-xs hover:bg-secondary transition-colors` — outlined pill buttons in a flex-wrap row.
+```
+[Used create_deal: property_address="500 Las Olas Blvd", client_name="Victoria Lane" → created deal abc123]
+[Used draft_social_post: platform="instagram", property_address="500 Las Olas Blvd" → drafted post]
+```
 
-Props: `lastToolUsed?: string`, `topic?: string`, `onSend: (msg: string) => void`
+This gives the AI enough context to know "which post" and "which listing" when the user says "make it shorter."
 
-### 2. Update `src/components/chat/ChatPanel.tsx`
-- Import `SuggestionChips`
-- Track `lastToolUsed` in component state, set it after streaming completes from `toolsUsed` or conversation context
-- Render `<SuggestionChips>` between the messages scroll area and the input box (inside the sticky input container, above the textarea), only when not currently streaming and messages exist
-- When a chip is clicked, call `sendMessage(chipText)` and clear the chips
+### 2. Edge function: Add recent activity context to system prompt (`supabase/functions/chat/index.ts`)
+
+Fetch last 5 `task_history` entries and include them in the system prompt as `RECENT ACTIVITY` section, so even in a new conversation the AI knows what was done recently.
+
+Also fetch the title of the most recent conversation to reference it in greeting context.
+
+### 3. Frontend: Improve welcome message to reference last session (`ChatPanel.tsx`)
+
+Update `sendWelcomeMessage` to fetch the most recent conversation title and last task_history entries, then craft a greeting like: "Welcome back, Alex. Last time we worked on [conversation title]. Want to continue or start something new?"
+
+### 4. Edge function: Include tool_results in metadata for richer history
+
+When saving assistant messages, also store summarized tool results in the metadata (not just tool name + input), so reloaded conversations preserve full context.
 
 ## Files modified: 2
-- `src/components/chat/SuggestionChips.tsx` (new)
-- `src/components/chat/ChatPanel.tsx`
+- `supabase/functions/chat/index.ts` — enrich message history with tool results, add recent activity to system prompt, store richer metadata
+- `src/components/chat/ChatPanel.tsx` — improve welcome message to reference last session work
 
