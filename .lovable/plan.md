@@ -1,35 +1,24 @@
 
 
-# Enable Multi-Action Tool Chaining
+# Fix Content Card Detection and Rendering
 
 ## Changes
 
-### 1. `supabase/functions/chat/index.ts`
+### 1. `src/components/chat/ContentCardRenderer.tsx`
 
-**A. Add entity ID tracking variables** (after line 541, before `while` loop):
-- `let lastCreatedDealId: string | null = null;`
-- `let lastCreatedContactId: string | null = null;`
+**A. Replace `detectEmail` (lines 10-14):** Broader detection — handle markdown-wrapped headers (`**Subject:**`), match greeting+closing patterns even without Subject line.
 
-**B. Capture entity IDs from tool results** (after `executeTool` returns, ~line 622):
-- If `tool.name === "create_deal"` and result has `id`, set `lastCreatedDealId`
-- If `tool.name === "add_contact"` and result has `id`, set `lastCreatedContactId`
-- If `tool.name === "get_deal_details"` and result has `id`, set `lastCreatedDealId`
-- If `tool.name === "search_contacts"` and result is array with items, set `lastCreatedContactId = result[0].id`
+**B. Replace `parseEmail` (lines 26-51):** Strip markdown bold from headers before matching, clean body of `**bold**` and `*italic*` artifacts, strip leading dashes/extra newlines.
 
-**C. Include entity IDs in done event** (line 648):
-- Add `last_deal_id: lastCreatedDealId` and `last_contact_id: lastCreatedContactId` to the done payload
+**C. Replace `detectSocial` (lines 16-20):** Add Twitter/X/TikTok to platform list, detect hashtag-heavy content as social posts.
 
-**D. Add MULTI-ACTION BEHAVIOR section to system prompt** (after line 519, before the closing backtick):
-- Instructions for chaining actions, with example flow and reminder about 5 tool call limit
+**D. Update `parseSocial` (lines 53-83):** Add markdown cleanup to `postContent` — strip wrapping quotes/backticks/asterisks and inline bold markers. Also update platform regex on line 54 to include new platforms.
 
-### 2. `src/components/chat/ChatPanel.tsx`
+### 2. `src/components/chat/EmailCard.tsx`
 
-**Update "done" event handler** (lines 270-273):
-- Parse `last_deal_id` and `last_contact_id` from the done event
-- Build context with `parseConversationContext` and set entity IDs
-- Call `onConversationContext` with the enriched context
+**Update "To" field (line 13):** If `to` is empty, show "Recipient" in muted style as placeholder.
 
 ## Files Modified: 2
-- `supabase/functions/chat/index.ts`
-- `src/components/chat/ChatPanel.tsx`
+- `src/components/chat/ContentCardRenderer.tsx`
+- `src/components/chat/EmailCard.tsx`
 
