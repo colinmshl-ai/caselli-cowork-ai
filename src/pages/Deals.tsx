@@ -114,7 +114,7 @@ const Deals = () => {
           <h1 className="text-xl font-semibold text-foreground md:text-2xl">Deals</h1>
           <button
             onClick={openNew}
-            className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            className="rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
             Add Deal
           </button>
@@ -126,7 +126,7 @@ const Deals = () => {
             <button
               key={s.value}
               onClick={() => setFilter(s.value)}
-              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-md px-3 min-h-[44px] text-xs font-medium transition-colors ${
                 filter === s.value
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
@@ -160,42 +160,53 @@ const Deals = () => {
               <button
                 key={deal.id}
                 onClick={() => openEdit(deal)}
-                className="flex w-full items-center gap-4 border-b border-border px-5 py-3.5 text-left transition-colors hover:bg-secondary/50"
+                className="w-full border-b border-border px-5 py-3.5 text-left transition-colors hover:bg-secondary/50 min-h-[44px]"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-foreground truncate">
-                      {deal.property_address}
-                    </span>
-                    {deal.client_name && (
-                      <span className="text-sm text-muted-foreground truncate hidden sm:inline">
-                        {deal.client_name}
+                {/* Mobile card layout */}
+                <div className="md:hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-foreground truncate">{deal.property_address}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`h-2 w-2 rounded-full ${STAGE_COLORS[deal.stage] || "bg-gray-400"}`} />
+                      <span className="text-xs text-muted-foreground">{STAGE_LABELS[deal.stage] || deal.stage}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    {deal.client_name && <span className="text-xs text-muted-foreground truncate">{deal.client_name}</span>}
+                    {deal.closing_date && (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(deal.closing_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                    {isDeadlineSoon(deal) && (
+                      <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                        Deadline soon
                       </span>
                     )}
                   </div>
                 </div>
 
-                {isDeadlineSoon(deal) && (
-                  <span className="hidden sm:inline whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                    Deadline soon
-                  </span>
-                )}
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`h-2 w-2 rounded-full ${STAGE_COLORS[deal.stage] || "bg-gray-400"}`} />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {STAGE_LABELS[deal.stage] || deal.stage}
-                  </span>
+                {/* Desktop row layout */}
+                <div className="hidden md:flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-foreground truncate">{deal.property_address}</span>
+                      {deal.client_name && <span className="text-sm text-muted-foreground truncate">{deal.client_name}</span>}
+                    </div>
+                  </div>
+                  {isDeadlineSoon(deal) && (
+                    <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">Deadline soon</span>
+                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`h-2 w-2 rounded-full ${STAGE_COLORS[deal.stage] || "bg-gray-400"}`} />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{STAGE_LABELS[deal.stage] || deal.stage}</span>
+                  </div>
+                  {deal.closing_date && (
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(deal.closing_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                  )}
                 </div>
-
-                {deal.closing_date && (
-                  <span className="text-xs text-muted-foreground whitespace-nowrap hidden md:inline">
-                    {new Date(deal.closing_date).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                )}
               </button>
             ))}
           </div>

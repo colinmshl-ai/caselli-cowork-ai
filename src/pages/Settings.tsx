@@ -150,7 +150,7 @@ const Settings = () => {
             <label className="text-sm text-muted-foreground">Specialties</label>
             <div className="flex flex-wrap gap-3">
               {SPECIALTIES_OPTIONS.map((s) => (
-                <label key={s} className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer">
+                <label key={s} className="flex items-center gap-1.5 min-h-[44px] text-sm text-foreground cursor-pointer">
                   <input
                     type="checkbox"
                     checked={biz.specialties.includes(s)}
@@ -194,7 +194,7 @@ const Settings = () => {
             <label className="text-sm text-muted-foreground">Brand Tone</label>
             <div className="flex flex-wrap gap-4">
               {TONE_OPTIONS.map((t) => (
-                <label key={t.value} className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer">
+                <label key={t.value} className="flex items-center gap-1.5 min-h-[44px] text-sm text-foreground cursor-pointer">
                   <input
                     type="radio"
                     name="brand_tone"
@@ -285,7 +285,7 @@ const Settings = () => {
                 });
               }
             }}
-            className="mt-4 rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-secondary/50 transition-colors"
+            className="mt-4 rounded-md border border-border px-4 min-h-[44px] py-2.5 text-sm text-foreground hover:bg-secondary/50 transition-colors"
           >
             Manage Subscription
           </button>
@@ -341,7 +341,7 @@ const SaveBtn = ({ loading, onClick }: { loading: boolean; onClick: () => void }
   <button
     onClick={onClick}
     disabled={loading}
-    className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+    className="mt-2 rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
   >
     {loading ? "Saving..." : "Save"}
   </button>

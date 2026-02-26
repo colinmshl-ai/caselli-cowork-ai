@@ -184,7 +184,7 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[480px] overflow-y-auto bg-background border-l border-border">
+      <div className="fixed right-0 top-0 bottom-0 z-50 w-full md:max-w-[480px] overflow-y-auto bg-background border-l border-border">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-sm font-semibold text-foreground">
             {deal ? "Edit Deal" : "New Deal"}
@@ -321,13 +321,13 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="flex-1 rounded-md bg-primary min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save"}
             </button>
             <button
               onClick={onClose}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
             </button>

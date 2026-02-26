@@ -176,7 +176,7 @@ const Onboarding = () => {
                     <button
                       key={s}
                       onClick={() => toggleSpecialty(s)}
-                      className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                      className={`rounded-md border px-3 min-h-[44px] py-2.5 text-sm transition-colors ${
                         specialties.includes(s)
                           ? "border-primary bg-primary/10 text-foreground"
                           : "border-border text-muted-foreground hover:border-foreground"
@@ -205,7 +205,7 @@ const Onboarding = () => {
 
             <button
               onClick={() => setStep(2)}
-              className="w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              className="w-full rounded-md bg-primary min-h-[44px] py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
               Next
             </button>
@@ -256,19 +256,19 @@ const Onboarding = () => {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setStep(1)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="min-h-[44px] text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={() => setStep(3)}
-                className="flex-1 rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                className="flex-1 rounded-md bg-primary min-h-[44px] py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
               >
                 Next
               </button>
               <button
                 onClick={() => setStep(3)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="min-h-[44px] text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Skip
               </button>
@@ -316,13 +316,13 @@ const Onboarding = () => {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setStep(2)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="min-h-[44px] text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={() => setStep(4)}
-                className="flex-1 rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                className="flex-1 rounded-md bg-primary min-h-[44px] py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
               >
                 Next
               </button>
@@ -350,7 +350,7 @@ const Onboarding = () => {
                   </div>
                   <button
                     onClick={() => toast.info("Coming soon — we'll notify you when this is available")}
-                    className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+                    className="rounded-md border border-border px-3 min-h-[44px] py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
                   >
                     Connect
                   </button>
@@ -361,13 +361,13 @@ const Onboarding = () => {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setStep(3)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="min-h-[44px] text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={() => setStep(5)}
-                className="flex-1 rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                className="flex-1 rounded-md bg-primary min-h-[44px] py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
               >
                 Next
               </button>
@@ -385,7 +385,7 @@ const Onboarding = () => {
             <button
               onClick={handleFinish}
               disabled={saving}
-              className="rounded-md bg-primary px-8 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="rounded-md bg-primary px-8 min-h-[44px] py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {saving ? "Setting up…" : "Start Working"}
             </button>

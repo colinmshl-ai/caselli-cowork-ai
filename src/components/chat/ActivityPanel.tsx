@@ -110,7 +110,7 @@ const ActivityPanel = ({ onQuickAction }: ActivityPanelProps) => {
               <button
                 key={a.label}
                 onClick={() => onQuickAction(a.message)}
-                className="block w-full text-left text-sm text-primary hover:opacity-70 transition-opacity py-1.5"
+                className="block w-full text-left text-sm text-primary hover:opacity-70 transition-opacity min-h-[44px] py-2.5"
               >
                 {a.label}
               </button>

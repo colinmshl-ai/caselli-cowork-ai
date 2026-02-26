@@ -92,7 +92,7 @@ const ContactSlideOver = ({ open, contact, onClose, onSaved, onDelete }: Contact
   return (
     <>
       <div className="fixed inset-0 z-40 bg-foreground/10" onClick={onClose} />
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[480px] overflow-y-auto bg-background border-l border-border">
+      <div className="fixed right-0 top-0 bottom-0 z-50 w-full md:max-w-[480px] overflow-y-auto bg-background border-l border-border">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-sm font-semibold text-foreground">{contact ? "Edit Contact" : "New Contact"}</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors"><X size={18} /></button>
@@ -114,10 +114,10 @@ const ContactSlideOver = ({ open, contact, onClose, onSaved, onDelete }: Contact
           <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} className={cn(inputClass, "resize-none")} />
 
           <div className="flex items-center gap-4 pt-2">
-            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-md bg-primary min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
               {saving ? "Saving…" : "Save"}
             </button>
-            <button onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+            <button onClick={onClose} className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
           </div>
 
           {contact && (
