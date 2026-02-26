@@ -150,7 +150,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const sendWelcomeMessage = async () => {
     if (!user) return;
 
-    const [profileRes, dealsRes, taskRes] = await Promise.all([
+    const [profileRes, dealsRes, taskRes, lastConvoRes] = await Promise.all([
       supabase.from("profiles").select("full_name").eq("id", user.id).single(),
       supabase
         .from("deals")
@@ -164,17 +164,29 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(5),
+      supabase
+        .from("conversations")
+        .select("title")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1),
     ]);
 
     const fullName = profileRes.data?.full_name || "";
     const firstName = fullName.split(" ")[0] || "there";
     const deals = dealsRes.data || [];
     const tasks = taskRes.data || [];
+    const lastConvoTitle = lastConvoRes.data?.[0]?.title;
 
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
     let content = greeting + ", " + firstName + "! ";
+
+    // Reference last session if available
+    if (lastConvoTitle && (deals.length > 0 || tasks.length > 0)) {
+      content += `Last time we worked on **${lastConvoTitle}**. `;
+    }
 
     if (deals.length === 0 && tasks.length === 0) {
       content += "I'm Caselli Cowork, your AI coworker. I've reviewed your business profile and I'm ready to help.\n\nHere are a few things I can do right now:\n\n";
@@ -214,7 +226,15 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         }
       }
 
-      content += "\nWhat would you like to focus on?";
+      // Reference recent tasks
+      if (tasks.length > 0) {
+        content += "\n**Recent activity:**\n";
+        for (const t of tasks.slice(0, 3)) {
+          content += "- " + (t.description || t.task_type) + "\n";
+        }
+      }
+
+      content += "\nWant to continue where we left off, or start something new?";
     }
 
     const { data: convo, error: convoErr } = await supabase
