@@ -270,7 +270,21 @@ const Settings = () => {
             </div>
           </div>
           <button
-            onClick={() => toast({ title: "Coming soon", description: "Billing management coming soon." })}
+            onClick={async () => {
+              try {
+                const { data, error } = await supabase.functions.invoke("customer-portal");
+                if (error) throw error;
+                if (data?.url) {
+                  window.location.href = data.url;
+                }
+              } catch (err: any) {
+                toast({
+                  title: "Error",
+                  description: err?.message || "Could not open billing portal. You may need an active subscription first.",
+                  variant: "destructive",
+                });
+              }
+            }}
             className="mt-4 rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-secondary/50 transition-colors"
           >
             Manage Subscription

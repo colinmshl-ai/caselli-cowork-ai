@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Onboarding from "./pages/Onboarding";
+import Billing from "./pages/Billing";
 import Chat from "./pages/Chat";
 import Deals from "./pages/Deals";
 import Contacts from "./pages/Contacts";
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+            <Route path="/billing" element={<Billing />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/chat" element={<Chat />} />
               <Route path="/deals" element={<Deals />} />
