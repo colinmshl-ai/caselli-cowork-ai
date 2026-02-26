@@ -1,91 +1,95 @@
 
 
-# Streaming Chat Responses via SSE
+# Rebrand to Match caselli.app + "Caselli Cowork"
 
-## Overview
-Replace the current request-response pattern with Server-Sent Events (SSE) streaming. The edge function will stream text deltas and tool status events. The frontend will progressively render the assistant's response.
+## Brand Analysis
 
-## 1. Edge Function (`supabase/functions/chat/index.ts`)
+The parent site caselli.app uses:
+- **Dark brown/maroon background** (~`#3A2030` range)
+- **Serif logotype** for "Caselli" (elegant, editorial)
+- **Accent colors**: pink `#E91E63`, gold `#FFC107`, deep orange `#FF5722`
+- Light/muted text on dark backgrounds
 
-**Keep unchanged:** Auth, context fetching (lines 1-431), `executeTool`, `TOOLS`, `TOOL_DESCRIPTIONS`, system prompt construction, message history building.
+Current Cowork app uses a light theme with Inter sans-serif and a warm tan primary (`#A1866F`). The rebrand will adopt the parent's dark palette and accent colors while keeping the app functional and readable.
 
-**Replace the Anthropic call + tool loop + response (lines 441-625) with streaming logic:**
+## Changes
 
-- Create a `ReadableStream` and return it immediately with `Content-Type: text/event-stream` + CORS headers
-- Inside the stream's `start(controller)` callback, run the async logic:
+### 1. Color System (`src/index.css`)
 
-### SSE helper
-```typescript
-function sendSSE(controller, event: string, data: object) {
-  controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-}
-```
+Update CSS custom properties to reflect caselli.app's dark aesthetic:
 
-### Streaming Anthropic call
-- Add `stream: true` to the Anthropic request body
-- Read the response as a stream line-by-line (SSE from Anthropic)
-- Parse Anthropic SSE events:
-  - `content_block_delta` with `delta.type === "text_delta"` → forward as `event: text_delta` with `data: {"text": delta.text}` and accumulate into `fullText`
-  - `content_block_start` with `content_block.type === "tool_use"` → start tracking current tool call (name, id, accumulate input JSON)
-  - `content_block_delta` with `delta.type === "input_json_delta"` → accumulate JSON string for the tool input
-  - `content_block_stop` → if tracking a tool_use block, finalize the tool input
-  - `message_delta` with `stop_reason === "tool_use"` → execute accumulated tools, send `tool_status` events, then make another streaming Anthropic call with tool results and continue parsing
-  - `message_delta` with `stop_reason === "end_turn"` → done
+**Light mode (now dark by default to match parent):**
+- `--background`: deep brown-maroon (`#2D1B25` → ~`350 30% 14%`)
+- `--foreground`: warm off-white (`#F5E6E0` → ~`15 40% 92%`)
+- `--card` / `--popover`: slightly lighter dark (`#3A2530`)
+- `--primary`: pink `#E91E63` → `340 82% 52%`
+- `--primary-foreground`: white
+- `--secondary`: muted dark brown panel
+- `--muted-foreground`: warm gray
+- `--border`: subtle warm dark border
+- `--accent`: gold-tinted `#FFC107` for highlights
+- `--destructive`: keep red
 
-### Tool use during streaming
-When `stop_reason === "tool_use"`:
-1. Send `event: tool_status` for each tool being called
-2. Execute all tools via `executeTool()` + log to `task_history`
-3. Build `currentMessages` with assistant content + tool results
-4. Make another streaming Anthropic call with `stream: true`
-5. Continue parsing the new stream (loop up to 5 iterations)
+Remove the `.dark` block (app is now inherently dark-themed).
 
-### After streaming completes
-- Send `event: done` with `data: {"tools_used": [...]}`
-- Save complete assistant message to DB
-- Fire memory extraction (non-blocking, same as current)
-- Close the stream
+### 2. Typography (`src/index.css` + `tailwind.config.ts`)
 
-### Error handling
-- Wrap in try/catch; on error send `event: error` then close stream
+- Import a serif font for the brand wordmark: `Playfair Display` (closest to caselli.app's serif logo)
+- Add `font-serif: ['Playfair Display', 'Georgia', 'serif']` to tailwind config
+- Keep `Inter` as `font-sans` for all body/UI text (no change there)
 
-## 2. Frontend (`src/components/chat/ChatPanel.tsx`)
+### 3. Text Updates — "Caselli" → "Caselli Cowork"
 
-**Replace `supabase.functions.invoke("chat", ...)` in `sendMessage` with:**
+All branded text references updated:
 
-```typescript
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const session = (await supabase.auth.getSession()).data.session;
-const response = await fetch(`${supabaseUrl}/functions/v1/chat`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${session?.access_token}`,
-    "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-  },
-  body: JSON.stringify({ conversation_id: convoId, message: text.trim() }),
-});
-```
+| File | Current | New |
+|------|---------|-----|
+| `index.html` | `<title>Caselli Cowork</title>` | Keep (already correct) |
+| `index.html` | og/meta descriptions | Already say "Caselli Cowork" — keep |
+| `src/pages/Index.tsx` | Nav: "Caselli" | "Caselli Cowork" with serif font on "Caselli" |
+| `src/pages/Index.tsx` | Hero text | Update copy |
+| `src/pages/Login.tsx` | "Caselli" | "Caselli Cowork" |
+| `src/pages/Signup.tsx` | "Caselli" | "Caselli Cowork" |
+| `src/pages/Onboarding.tsx` | "Caselli" wordmark | "Caselli Cowork" |
+| `src/components/AppLayout.tsx` | "C" in nav rail | Keep "C" (single letter is fine for icon) |
+| `src/components/chat/ChatPanel.tsx` | "Caselli" in welcome + placeholder | "Caselli Cowork" |
+| Email templates (6 files) | `<Text style={brand}>Caselli</Text>` | "Caselli Cowork" |
+| `supabase/functions/chat/index.ts` | system prompt "You are Caselli" | "You are Caselli Cowork" |
+| `supabase/functions/auth-email-hook/index.ts` | `SITE_NAME = "Caselli Cowork AI"` | "Caselli Cowork" |
 
-**Stream reading:**
-- Check `response.headers.get("content-type")` — if `text/event-stream`, use streaming; otherwise fall back to current JSON behavior
-- Use `response.body.getReader()` + `TextDecoder` to read chunks
-- Parse SSE events from the text buffer (split on `\n\n`, extract `event:` and `data:` lines)
-- Before streaming starts, add a placeholder assistant message to `messages` state with empty content
-- On `text_delta`: update the last message's content by appending the delta text
-- On `tool_status`: update `typingStatus` with the tool's status message
-- On `done`: parse `tools_used`, call `onConversationContext`, fetch the saved message from DB to get the real ID, replace the placeholder
-- On `error`: show error in the message
+### 4. Wordmark Styling
 
-**Key state management:**
-- Use a ref (`streamingContentRef`) to accumulate text without causing re-renders on every character
-- Batch UI updates using `requestAnimationFrame` or a 50ms throttle to avoid excessive re-renders
-- Clear `typingStatus` when text starts streaming (switch from "Thinking..." to showing the actual text)
+Wherever the brand name appears as a wordmark (nav, login, signup, onboarding):
+- "Caselli" in `font-serif` (Playfair Display), "Cowork" in `font-sans` (Inter) at lighter weight
+- This mirrors caselli.app's serif logo while distinguishing the sub-product
 
-## 3. Fallback
-- If `response.headers` doesn't indicate SSE, parse as JSON and use the existing `fnData.response` / `fnData.tools_used` flow (unchanged from current code)
+Example: `<span className="font-serif">Caselli</span> <span className="font-sans font-light">Cowork</span>`
 
-## Files modified: 2
-- `supabase/functions/chat/index.ts` (streaming response)
-- `src/components/chat/ChatPanel.tsx` (stream reader)
+### 5. Landing Page (`src/pages/Index.tsx`)
+
+- Update nav brand to dual-font wordmark
+- Update hero section colors (buttons use new pink primary)
+- Footer links stay the same style, just recolored
+
+### 6. Button Styling
+
+- Primary buttons: pink `#E91E63` background with white text (matching parent's accent)
+- Email template buttons: update `backgroundColor` from `#A1866F` to `#E91E63`
+
+### 7. Files Modified (15 total)
+
+**Frontend (8):**
+- `src/index.css` — color system + serif font import
+- `tailwind.config.ts` — add `font-serif`
+- `src/pages/Index.tsx` — wordmark + colors
+- `src/pages/Login.tsx` — wordmark
+- `src/pages/Signup.tsx` — wordmark
+- `src/pages/Onboarding.tsx` — wordmark
+- `src/components/chat/ChatPanel.tsx` — text updates
+- `src/components/AppLayout.tsx` — sidebar background
+
+**Backend (7):**
+- 6 email templates — brand text + button color
+- `supabase/functions/chat/index.ts` — system prompt
+- `supabase/functions/auth-email-hook/index.ts` — site name
 
