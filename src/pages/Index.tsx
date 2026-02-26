@@ -108,13 +108,13 @@ const Index = () => {
       {/* Footer */}
       <footer className="py-16 text-center">
         <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-          <span className="hover:text-foreground cursor-pointer transition-colors">About</span>
+          <span>About</span>
           <span>·</span>
-          <span className="hover:text-foreground cursor-pointer transition-colors">Privacy</span>
+          <span>Privacy</span>
           <span>·</span>
-          <span className="hover:text-foreground cursor-pointer transition-colors">Terms</span>
+          <span>Terms</span>
           <span>·</span>
-          <span className="hover:text-foreground cursor-pointer transition-colors">Contact</span>
+          <span>Contact</span>
         </div>
       </footer>
     </div>

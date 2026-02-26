@@ -28,7 +28,8 @@ const ActivityPanel = ({ onQuickAction }: ActivityPanelProps) => {
   const { data: deals = [] } = useQuery({
     queryKey: ["activity-deals"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("deals").select("*");
+      if (!user) throw new Error("Not authenticated");
+      const { data, error } = await supabase.from("deals").select("*").eq("user_id", user.id);
       if (error) throw error;
       return data;
     },
@@ -38,9 +39,11 @@ const ActivityPanel = ({ onQuickAction }: ActivityPanelProps) => {
   const { data: taskHistory = [] } = useQuery({
     queryKey: ["activity-tasks"],
     queryFn: async () => {
+      if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
         .from("task_history")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(10);
       if (error) throw error;
