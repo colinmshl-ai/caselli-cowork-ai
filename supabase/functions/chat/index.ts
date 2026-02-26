@@ -592,27 +592,64 @@ MULTI-ACTION BEHAVIOR:
           while (iterations < 5) {
             iterations++;
 
-            const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-              method: "POST",
-              headers: {
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-              },
-              body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
-                system: systemPrompt,
-                messages: currentMessages,
-                tools: TOOLS,
-                max_tokens: 4096,
-                stream: true,
-              }),
-            });
+            // Retry logic for Anthropic API
+            let anthropicRes: Response | null = null;
+            let retryCount = 0;
+            const maxRetries = 2;
 
-            if (!anthropicRes.ok) {
+            while (retryCount <= maxRetries) {
+              anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "x-api-key": ANTHROPIC_API_KEY,
+                  "anthropic-version": "2023-06-01",
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: "claude-sonnet-4-20250514",
+                  system: systemPrompt,
+                  messages: currentMessages,
+                  tools: TOOLS,
+                  max_tokens: 4096,
+                  stream: true,
+                }),
+              });
+
+              if (anthropicRes.ok) break;
+
               const errText = await anthropicRes.text();
+
+              // Rate limit or overloaded — retry after delay
+              if ((anthropicRes.status === 429 || anthropicRes.status === 529) && retryCount < maxRetries) {
+                console.warn(`Anthropic ${anthropicRes.status}, retry ${retryCount + 1}/${maxRetries}`);
+                retryCount++;
+                await new Promise((r) => setTimeout(r, 2000));
+                continue;
+              }
+
+              // Context window too long — trim and retry once
+              if (anthropicRes.status === 400 && errText.toLowerCase().includes("context window") && retryCount === 0) {
+                console.warn("Context window exceeded, trimming to last 10 messages");
+                currentMessages = currentMessages.slice(-10);
+                retryCount++;
+                continue;
+              }
+
+              // Non-retryable error
+              let userMessage = "Something went wrong. Please try again.";
+              if (anthropicRes.status === 429 || anthropicRes.status === 529) {
+                userMessage = "I'm handling a lot of requests right now. Please try again in a moment.";
+              } else if (anthropicRes.status === 400 && errText.toLowerCase().includes("context window")) {
+                userMessage = "This conversation is getting long. Starting a new chat may help.";
+              }
               console.error("Anthropic API error:", errText);
-              sendSSE(controller, "error", { message: `Chat error: ${errText.slice(0, 200)}` });
+              sendSSE(controller, "error", { message: userMessage });
+              controller.close();
+              return;
+            }
+
+            if (!anthropicRes || !anthropicRes.ok) {
+              sendSSE(controller, "error", { message: "Something went wrong. Please try again." });
               controller.close();
               return;
             }
