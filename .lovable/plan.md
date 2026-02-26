@@ -1,38 +1,70 @@
 
 
-# Enhance AI System Prompt for Better Real Estate Intelligence
+# Make the Activity Panel Show Real Activity Data
 
 ## Current State
-The system prompt (lines 466-525) already has good structure with sections for agent context, personality, capabilities, rules, and multi-action behavior. The requested enhancements overlap with some existing content but add more depth.
+- The edge function **already inserts** into `task_history` (lines 660-665) after each tool call, but the insert is fire-and-forget (no `await`), so failures are silent.
+- The ActivityPanel already queries `task_history` with a 10s refetch interval.
+- Stats are computed from real data but some logic doesn't match the user's intent.
 
-## Changes — `supabase/functions/chat/index.ts`
+## Changes
 
-### 1. Update opening line (line 466)
-Replace the generic intro with the sharper personality description:
-```
-"You are Caselli, a sharp, proactive real estate AI coworker. You anticipate needs, not just respond to requests. When an agent mentions a listing, you automatically think about what marketing materials they'll need, what deadlines to track, and who to notify. You speak in the agent's chosen brand tone at all times."
-```
+### 1. `supabase/functions/chat/index.ts` — Await the task_history insert (line 660)
+Add `await` to the insert call so failures are logged and data is guaranteed to be written before the response completes.
 
-### 2. Expand "YOUR PERSONALITY AND BEHAVIOR" section (lines 492-501)
-Add the enhanced proactive suggestions after the existing bullet points:
-```
-After completing any task, suggest 2-3 logical next steps. Examples:
-- After creating a deal → suggest drafting marketing materials, setting up deadline reminders, and notifying the client
-- After drafting a social post → suggest creating versions for other platforms, scheduling the post, and drafting a matching email blast
-- After adding a contact → suggest drafting an intro email, linking them to an existing deal, and setting a follow-up reminder
-```
-
-### 3. Add "MEMORY AWARENESS" section (before RULES, ~line 512)
-Insert a new section:
-```
-MEMORY AWARENESS:
-- Reference the agent's business context naturally. Use their brokerage name, market area, specialties, and preferred vendors in responses.
-- If they're in a luxury market, use elevated language. If they're in a first-time buyer market, use approachable language.
-- Weave remembered facts from past conversations into your responses naturally — don't announce "I remember that..."
+```typescript
+// Line 660: add await and .then() error logging
+await adminClient.from("task_history").insert({
+  user_id: userId,
+  task_type: taskType,
+  description: taskDescription,
+  metadata: { tool: tool.name, input: tool.input },
+}).then(({ error }) => { if (error) console.error("task_history insert error:", error); });
 ```
 
-### 4. Keep all existing tool definitions, brand tone logic, and rules unchanged.
+### 2. `src/components/chat/ActivityPanel.tsx` — Fix stats logic and add activity icons
 
-## Files modified: 1
-- `supabase/functions/chat/index.ts`
+**Stats updates:**
+- **Tasks Completed**: Change from "this week" to "today" (`startOfDay` filter)
+- **New Leads**: Query contacts where `contact_type = 'lead'` and `created_at` within last 7 days, instead of deals with `stage = 'lead'`
+
+**Add a contacts query** for the New Leads stat:
+```typescript
+const { data: recentLeadContacts = [] } = useQuery({
+  queryKey: ["activity-lead-contacts"],
+  queryFn: async () => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("contacts")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("contact_type", "lead")
+      .gte("created_at", sevenDaysAgo);
+    if (error) throw error;
+    return data;
+  },
+  enabled: !!user,
+  refetchInterval: 30000,
+});
+```
+
+**Updated stats:**
+```typescript
+const tasksToday = taskHistory.filter(t => new Date(t.created_at) >= startOfToday).length;
+const newLeads = recentLeadContacts.length;
+const stats = [
+  { label: "Active Deals", value: activeDeals },
+  { label: "Deadlines This Week", value: deadlinesThisWeek },
+  { label: "Tasks Today", value: tasksToday },
+  { label: "New Leads", value: newLeads },
+];
+```
+
+**Add icons** to Recent Activity entries based on `task_type`:
+- Map task types to lucide icons (e.g., `deal_create` → `Home`, `content_drafted` → `FileText`, `contact_updated` → `UserPlus`, `deal_update` → `RefreshCw`, `deadline_check` → `Clock`, default → `Activity`)
+- Replace the plain dot with the mapped icon, sized at 14px
+
+### Files modified: 2
+- `supabase/functions/chat/index.ts` — await task_history insert
+- `src/components/chat/ActivityPanel.tsx` — fix stats logic, add lead contacts query, add activity type icons
 
