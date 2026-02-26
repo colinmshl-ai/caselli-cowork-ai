@@ -4,12 +4,20 @@ import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/chat/ChatPanel";
 import ActivityPanel from "@/components/chat/ActivityPanel";
 
+export interface ConversationContext {
+  lastToolUsed?: string;
+  lastDealId?: string;
+  lastContactId?: string;
+  topic?: "deals" | "content" | "contacts" | "general";
+}
+
 const Chat = () => {
   const [activeTab, setActiveTab] = useState<"chat" | "activity">("chat");
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const sendMessageRef = useRef<((msg: string) => void) | null>(null);
+  const [conversationContext, setConversationContext] = useState<ConversationContext>({ topic: "general" });
 
   useEffect(() => {
     const prompt = searchParams.get("prompt");
@@ -63,6 +71,7 @@ const Chat = () => {
           pendingPrompt={pendingPrompt}
           onPromptConsumed={() => setPendingPrompt(null)}
           sendMessageRef={sendMessageRef}
+          onConversationContext={setConversationContext}
         />
       </div>
 
@@ -72,7 +81,7 @@ const Chat = () => {
           activeTab !== "activity" ? "hidden md:flex" : "flex"
         }`}
       >
-        <ActivityPanel onQuickAction={handleQuickAction} />
+        <ActivityPanel onQuickAction={handleQuickAction} conversationContext={conversationContext} />
       </div>
     </div>
   );

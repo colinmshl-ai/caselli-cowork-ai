@@ -6,11 +6,17 @@ import { Plus, ArrowUp, ChevronDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import ContentCardRenderer from "./ContentCardRenderer";
 import CopyButton from "./CopyButton";
+import type { ConversationContext } from "@/pages/Chat";
+
+const DEAL_TOOLS = ["get_active_deals", "get_deal_details", "update_deal", "check_upcoming_deadlines", "create_deal"];
+const CONTENT_TOOLS = ["draft_social_post", "draft_listing_description", "draft_email"];
+const CONTACT_TOOLS = ["search_contacts", "add_contact", "update_contact"];
 
 interface ChatPanelProps {
   pendingPrompt: string | null;
   onPromptConsumed: () => void;
   sendMessageRef: MutableRefObject<((msg: string) => void) | null>;
+  onConversationContext?: (ctx: ConversationContext) => void;
 }
 
 const TypingIndicator = ({ status }: { status: string }) => (
@@ -24,7 +30,43 @@ const TypingIndicator = ({ status }: { status: string }) => (
 const WELCOME_TEMPLATE = (firstName: string) =>
   `Hey ${firstName}! I'm Caselli, your AI coworker. I've reviewed your business profile and I'm ready to help. Here are a few things I can do right now:\n\n- **Draft social media posts** for your listings\n- **Track your deals** and flag upcoming deadlines\n- **Write emails** in your voice to clients and vendors\n- **Manage your contacts** and follow-up reminders\n\nWhat would you like to tackle first?`;
 
-const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPanelProps) => {
+function parseConversationContext(fnData: any): ConversationContext {
+  const toolsUsed: { tool: string; description: string }[] = fnData?.tools_used || [];
+  const toolNames = toolsUsed.map((t) => t.tool);
+
+  let topic: ConversationContext["topic"] = "general";
+  let lastToolUsed: string | undefined;
+  let lastDealId: string | undefined;
+  let lastContactId: string | undefined;
+
+  if (toolNames.some((t) => DEAL_TOOLS.includes(t))) {
+    topic = "deals";
+  } else if (toolNames.some((t) => CONTENT_TOOLS.includes(t))) {
+    topic = "content";
+  } else if (toolNames.some((t) => CONTACT_TOOLS.includes(t))) {
+    topic = "contacts";
+  }
+
+  if (toolNames.length > 0) {
+    lastToolUsed = toolNames[toolNames.length - 1];
+  }
+
+  // Extract IDs from tool_results if available
+  const toolResults = fnData?.tool_results;
+  if (Array.isArray(toolResults)) {
+    for (const result of toolResults) {
+      if (result?.deal_id) lastDealId = result.deal_id;
+      if (result?.contact_id) lastContactId = result.contact_id;
+    }
+  } else if (toolResults && typeof toolResults === "object") {
+    if (toolResults.deal_id) lastDealId = toolResults.deal_id;
+    if (toolResults.contact_id) lastContactId = toolResults.contact_id;
+  }
+
+  return { topic, lastToolUsed, lastDealId, lastContactId };
+}
+
+const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext }: ChatPanelProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeConvoId, setActiveConvoId] = useState<string | null>(null);
@@ -68,7 +110,6 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
   const sendWelcomeMessage = async () => {
     if (!user) return;
 
-    // Fetch first name from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("full_name")
@@ -78,7 +119,6 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
     const fullName = profile?.full_name || "";
     const firstName = fullName.split(" ")[0] || "there";
 
-    // Create welcome conversation
     const { data: convo, error: convoErr } = await supabase
       .from("conversations")
       .insert({ user_id: user.id, title: "Welcome" })
@@ -86,7 +126,6 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
       .single();
     if (convoErr || !convo) return;
 
-    // Insert welcome message
     const welcomeContent = WELCOME_TEMPLATE(firstName);
     const { data: msg } = await supabase
       .from("messages")
@@ -118,7 +157,6 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
 
     let convoId = activeConvoId;
 
-    // Create conversation if needed
     if (!convoId) {
       const title = text.slice(0, 40) + (text.length > 40 ? "…" : "");
       const { data, error } = await supabase
@@ -132,18 +170,15 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     }
 
-    // Save user message
     const userMsg = { conversation_id: convoId, role: "user", content: text.trim() };
     const { data: savedUser } = await supabase.from("messages").insert(userMsg).select().single();
     if (savedUser) setMessages((prev) => [...prev, savedUser]);
 
-    // Update conversation timestamp
     await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", convoId);
 
     setInput("");
     resetTextarea();
 
-    // Call AI edge function
     setTypingStatus("Thinking...");
     try {
       const { data: fnData, error: fnError } = await supabase.functions.invoke("chat", {
@@ -152,15 +187,18 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
 
       if (fnError) throw fnError;
 
-      // Flash tool descriptions sequentially
+      // Flash tool descriptions
       const toolsUsed: { tool: string; description: string }[] = fnData?.tools_used || [];
       for (const t of toolsUsed) {
         setTypingStatus(t.description);
         await new Promise((r) => setTimeout(r, 600));
       }
 
+      // Update conversation context
+      const ctx = parseConversationContext(fnData);
+      onConversationContext?.(ctx);
+
       const assistantContent = fnData?.response || "Sorry, I couldn't generate a response.";
-      // Fetch the saved assistant message from DB to get proper id/timestamps
       const { data: latestMessages } = await supabase
         .from("messages")
         .select("*")
@@ -178,7 +216,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
     } finally {
       setTypingStatus("");
     }
-  }, [activeConvoId, user, queryClient]);
+  }, [activeConvoId, user, queryClient, onConversationContext]);
 
   useEffect(() => {
     sendMessageRef.current = sendMessage;
@@ -200,6 +238,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
     setMessages([]);
     setShowConvos(false);
     initialized.current = true;
+    onConversationContext?.({ topic: "general" });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
