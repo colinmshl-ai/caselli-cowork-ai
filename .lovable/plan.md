@@ -1,31 +1,32 @@
 
 
-# Fix Onboarding Navigation Race Condition
+# Fix: AI Chat "AI service error" — model string + error handling
 
-## Root Cause
+## Changes — `supabase/functions/chat/index.ts`
 
-When `handleFinish` calls `navigate("/chat")`, the `/chat` route is wrapped in `ProtectedRoute`. ProtectedRoute's React Query cache still has `onboarding_completed: false` (stale data), so it immediately redirects back to `/onboarding`. This remounts the Onboarding component, resetting all state to Step 1.
+### 1. Fix memory extraction model string (line 702)
+Change `"claude-sonnet-4-5-20250929"` → `"claude-sonnet-4-5-20250514"` to match main chat model.
 
-The `savingRef` guard only protects the useEffect inside Onboarding itself — it does nothing about the ProtectedRoute redirect.
+### 2. Surface real errors instead of generic messages
 
-## Fix — `src/pages/Onboarding.tsx`
-
-**1. Import `useQueryClient`** from `@tanstack/react-query`.
-
-**2. In `handleFinish`, after the profile update succeeds and before navigating, set the cached profile data directly:**
-
+**Line 582** — Anthropic API error during main chat:
 ```typescript
-queryClient.setQueryData(["profile-sub", user.id], (old: any) => ({
-  ...old,
-  onboarding_completed: true,
-  trial_ends_at: trialEnd.toISOString(),
-}));
+sendSSE(controller, "error", { message: `Chat error: ${errText.slice(0, 200)}` });
 ```
 
-This ensures ProtectedRoute reads `onboarding_completed: true` from cache when evaluating the `/chat` route, preventing the redirect loop.
+**Line 746** — Streaming error catch:
+```typescript
+sendSSE(controller, "error", { message: `Chat error: ${err?.message || 'Unknown error'}` });
+```
 
-**3. Remove the 100ms setTimeout** (line 125) — it's no longer needed since the cache update is synchronous.
+**Line 763** — Outer catch:
+```typescript
+return new Response(JSON.stringify({ error: `Chat error: ${err?.message || 'Unknown error'}` }), {
+```
 
-## Files Modified: 1
-- `src/pages/Onboarding.tsx`
+### Note
+Memory extraction already has a try/catch (lines 692-739) — no change needed there.
+
+### Files modified: 1
+- `supabase/functions/chat/index.ts`
 
