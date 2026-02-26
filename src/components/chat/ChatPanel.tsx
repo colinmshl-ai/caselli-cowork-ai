@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, ArrowUp, ChevronDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import ReactMarkdown from "react-markdown";
+import ContentCardRenderer from "./ContentCardRenderer";
 
 interface ChatPanelProps {
   pendingPrompt: string | null;
@@ -294,9 +294,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
               }`}
             >
               {m.role === "assistant" ? (
-                <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
-                  <ReactMarkdown>{m.content}</ReactMarkdown>
-                </div>
+                <ContentCardRenderer content={m.content} />
               ) : (
                 <p className="whitespace-pre-wrap">{m.content}</p>
               )}
