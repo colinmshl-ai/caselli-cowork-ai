@@ -1,27 +1,22 @@
 
 
-# Improve Tool Status Display During Streaming
+# Fix Activity Panel Real-Time Recent Activity
 
-## Changes — `src/components/chat/ChatPanel.tsx` only
+## Changes
 
-### 1. Replace TypingIndicator component (lines 22-31)
-Replace with a multi-status version that shows completed tools with green dots and the current status with an animated pulse dot.
+### 1. `src/components/chat/ActivityPanel.tsx`
 
-### 2. Add `completedTools` state (after line 91)
-Add `const [completedTools, setCompletedTools] = useState<string[]>([]);` alongside existing state variables.
+**A. Add refresh options to deals query (lines 60-69):** Add `refetchOnWindowFocus: true` to the deals useQuery options.
 
-### 3. Update `tool_status` handler (lines 265-268)
-Before setting the new status, move the previous non-"Thinking..." status to the `completedTools` list with "done" suffix.
+**B. Add refresh options to taskHistory query (lines 71-85):** Add `refetchInterval: 10000` and `refetchOnWindowFocus: true` to the taskHistory useQuery options.
 
-### 4. Clear `completedTools` in finally block (line 349)
-Add `setCompletedTools([]);` next to `setTypingStatus("")`.
+**C. Replace task history rendering (lines 244-252):** Replace the horizontal layout with a vertical layout using a primary-colored dot indicator and stacked description + timestamp.
 
-### 5. Update TypingIndicator usage in JSX (line 487)
-Pass `completedTools` prop: `<TypingIndicator status={typingStatus} completedTools={completedTools} />`
+### 2. `src/components/chat/ChatPanel.tsx`
 
-### 6. Update render condition (line 482)
-Change to `{(typingStatus || completedTools.length > 0) && (` so completed tools remain visible until cleared.
+**Invalidate activity queries after streaming completes (after line 323):** Add two `queryClient.invalidateQueries` calls for `["activity-deals"]` and `["activity-tasks"]` so the activity panel refreshes immediately after chat actions complete.
 
-## Files Modified: 1
+## Files Modified: 2
+- `src/components/chat/ActivityPanel.tsx`
 - `src/components/chat/ChatPanel.tsx`
 
