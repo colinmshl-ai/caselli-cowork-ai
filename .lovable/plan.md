@@ -1,44 +1,41 @@
 
 
-# Phase 2: Chat Input Polish, Message Animations, Slide-Over Transitions
+# Phase 3: Heading Sizes, Page Padding, Skeleton Loaders
 
-## 1. Add Keyframes to Tailwind Config (`tailwind.config.ts`)
+## 1. Normalize Heading Sizes
 
-Add these keyframes and animations to the `extend` block:
+Current inconsistencies:
+- Deals/Contacts: `text-xl md:text-2xl` 
+- Settings/Activity: `text-sm font-semibold`
+- Billing: `text-2xl font-bold` and `text-3xl font-semibold`
 
-- `fade-in-up`: opacity 0→1, translateY 8px→0, 300ms ease-out (for message bubbles)
-- `slide-in-right`: translateX 100%→0, 250ms ease-out (for slide-over panels)
-- `fade-in`: opacity 0→1, 200ms (for overlay backdrop)
+Target: All page headers use `text-base font-semibold` for consistency with the minimal aesthetic. Section headings within Settings stay at `text-sm font-semibold uppercase tracking-wider` pattern.
 
-## 2. Polish Chat Input Area (`src/components/chat/ChatPanel.tsx`)
+**Files**: `Deals.tsx` (line 116), `Contacts.tsx` (header h1), `Settings.tsx` (line 136), `Billing.tsx` (lines 107-108), `ActivityPanel.tsx` (line 154)
 
-- Wrap the textarea + send button in a rounded pill container with `rounded-2xl border border-border bg-card shadow-sm` styling
-- Add subtle focus-within ring: `focus-within:ring-1 focus-within:ring-ring`
-- Make send button circular (`rounded-full`) and slightly larger
-- Add padding inside the pill container
+## 2. Normalize Page Padding
 
-## 3. Animate Message Bubbles (`src/components/chat/ChatPanel.tsx`)
+Target: All scrollable content areas use `px-5 py-5` consistently. Settings max-width stays at `max-w-2xl`. Billing max-width stays at `max-w-4xl` but gets `py-12` instead of `py-16`.
 
-- Add `animate-fade-in-up` class to each message wrapper div
-- Use staggered animation delay via inline style for messages loaded from history vs. new messages (new messages get the animation, history loads instantly)
+## 3. Replace Spinner Loading States with Skeleton Loaders
 
-## 4. Animate Typing Indicator (`src/components/chat/ChatPanel.tsx`)
+Currently every page uses the same spinner pattern:
+```html
+<div class="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+```
 
-- Add `animate-fade-in` to the typing indicator wrapper
-- Add a pulsing dot animation (three dots) alongside the status text
+Replace with contextual skeletons using the existing `Skeleton` component:
 
-## 5. Slide-Over Transitions (`ContactSlideOver.tsx` + `DealSlideOver.tsx`)
+- **Deals page**: 5 skeleton rows (each a horizontal bar mimicking a deal row)
+- **Contacts page**: 5 skeleton rows (similar pattern)
+- **Settings page**: 3 skeleton sections (label + input field shapes)
+- **Billing page**: 3 skeleton plan cards
+- **Activity panel**: Skeleton for greeting + 4 stat rows + 4 action rows
 
-Both slide-overs currently render/hide with `if (!open) return null` — no animation. Change to:
-
-- Always render the component (remove early return)
-- Use CSS transitions on the panel: `transition-transform duration-250 ease-out` with `translate-x-full` when closed, `translate-x-0` when open
-- Overlay backdrop: `transition-opacity duration-200` with `opacity-0 pointer-events-none` when closed
-- This gives a smooth slide-in/slide-out effect without needing a library
-
-## Files Modified: 4
-- `tailwind.config.ts` — add keyframes + animation utilities
-- `src/components/chat/ChatPanel.tsx` — pill input, message fade-in, typing dots
-- `src/components/contacts/ContactSlideOver.tsx` — slide transition
-- `src/components/deals/DealSlideOver.tsx` — slide transition
+## Files Modified: 6
+- `src/pages/Deals.tsx` — heading size, skeleton loader
+- `src/pages/Contacts.tsx` — heading size, skeleton loader
+- `src/pages/Settings.tsx` — heading size, skeleton loader
+- `src/pages/Billing.tsx` — heading sizes, padding, skeleton loader
+- `src/components/chat/ActivityPanel.tsx` — heading size (already consistent, no change needed)
 
