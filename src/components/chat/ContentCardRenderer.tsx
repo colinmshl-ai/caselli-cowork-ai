@@ -8,15 +8,17 @@ interface ContentCardRendererProps {
 }
 
 function detectEmail(content: string) {
-  const hasSubject = /Subject:\s*(.+)/i.test(content);
-  const hasRecipient = /To:\s*(.+)/i.test(content) || /\b(Dear |Hi |Hello )/i.test(content);
-  return hasSubject && hasRecipient;
+  const hasSubject = /\*?\*?Subject:?\*?\*?\s*(.+)/i.test(content);
+  const hasRecipient = /\*?\*?To:?\*?\*?\s*(.+)/i.test(content) || /\b(Dear |Hi |Hello |Hey )\w/i.test(content);
+  const hasClosing = /Best|Sincerely|Regards|Thanks|Warm regards/i.test(content);
+  return hasSubject || (hasRecipient && hasClosing);
 }
 
 function detectSocial(content: string) {
-  const hasPlatform = /\b(Instagram|Facebook|LinkedIn)\b/i.test(content);
-  const hasDraft = /draft|post|caption/i.test(content);
-  return hasPlatform && hasDraft;
+  const hasPlatform = /\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b/i.test(content);
+  const hasDraft = /draft|post|caption|here'?s/i.test(content);
+  const hasHashtags = /#\w+/.test(content);
+  return (hasPlatform && hasDraft) || (hasPlatform && hasHashtags);
 }
 
 function detectListing(content: string) {
@@ -24,26 +26,29 @@ function detectListing(content: string) {
 }
 
 function parseEmail(content: string) {
-  const toMatch = content.match(/To:\s*(.+)/i);
-  const subjectMatch = content.match(/Subject:\s*(.+)/i);
+  const cleanContent = content.replace(/\*\*(To|Subject|From):\*\*/gi, "$1:");
+  const toMatch = cleanContent.match(/To:\s*(.+)/i);
+  const subjectMatch = cleanContent.match(/Subject:\s*(.+)/i);
 
-  const to = toMatch?.[1]?.trim() || "";
-  const subject = subjectMatch?.[1]?.trim() || "";
+  const to = toMatch?.[1]?.trim().replace(/\*+/g, "") || "";
+  const subject = subjectMatch?.[1]?.trim().replace(/\*+/g, "") || "";
 
-  // Find where the email body starts (after Subject line or after a blank line following headers)
   let bodyStart = 0;
   if (subjectMatch) {
-    bodyStart = content.indexOf(subjectMatch[0]) + subjectMatch[0].length;
+    bodyStart = cleanContent.indexOf(subjectMatch[0]) + subjectMatch[0].length;
   } else if (toMatch) {
-    bodyStart = content.indexOf(toMatch[0]) + toMatch[0].length;
+    bodyStart = cleanContent.indexOf(toMatch[0]) + toMatch[0].length;
   }
 
-  const body = content.slice(bodyStart).replace(/^\s*\n/, "").trim();
+  let body = cleanContent.slice(bodyStart)
+    .replace(/^\s*[-—]+\s*\n/, "")
+    .replace(/^\s*\n/, "")
+    .trim();
+  body = body.replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
 
-  // Intro is everything before "To:" or "Subject:" whichever comes first
   const firstHeaderIdx = Math.min(
-    toMatch ? content.indexOf(toMatch[0]) : Infinity,
-    subjectMatch ? content.indexOf(subjectMatch[0]) : Infinity
+    toMatch ? cleanContent.indexOf(toMatch[0]) : Infinity,
+    subjectMatch ? cleanContent.indexOf(subjectMatch[0]) : Infinity
   );
   const intro = content.slice(0, firstHeaderIdx).trim();
 
@@ -51,7 +56,7 @@ function parseEmail(content: string) {
 }
 
 function parseSocial(content: string) {
-  const platformMatch = content.match(/\b(Instagram|Facebook|LinkedIn)\b/i);
+  const platformMatch = content.match(/\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b/i);
   const platform = platformMatch?.[1] || "Social";
 
   // Try to split on common patterns like "---", triple backticks, or "Here's" intro
@@ -76,8 +81,11 @@ function parseSocial(content: string) {
   const intro = lines.slice(0, splitIdx + 1).join("\n").trim();
   let postContent = lines.slice(splitIdx + 1).join("\n").trim();
 
-  // Strip wrapping quotes or backticks
-  postContent = postContent.replace(/^[`"]+|[`"]+$/g, "").trim();
+  // Clean markdown artifacts
+  postContent = postContent
+    .replace(/^["`\*]+|["`\*]+$/g, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .trim();
 
   return { intro, platform, postContent };
 }
