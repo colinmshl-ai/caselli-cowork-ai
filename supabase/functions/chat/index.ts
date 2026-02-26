@@ -57,7 +57,6 @@ const TOOLS = [
       required: ["property_address"],
     },
   },
-  // Content tools
   {
     name: "draft_social_post",
     description: "Draft a social media post. Types: new_listing, just_sold, open_house, market_update, tip, testimonial. Always match the agent's brand voice. After drafting, ask: 'Want me to adjust anything, or is this good to go?'",
@@ -103,7 +102,6 @@ const TOOLS = [
       required: ["email_type", "recipient_name"],
     },
   },
-  // Contact tools
   {
     name: "search_contacts",
     description: "Search contacts by name, email, or company.",
@@ -182,7 +180,6 @@ async function executeTool(
     }
     case "update_deal": {
       const { deal_id, ...updates } = toolInput;
-      // Filter out undefined values
       const cleanUpdates: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(updates)) {
         if (v !== undefined && v !== null) cleanUpdates[k] = v;
@@ -245,7 +242,6 @@ async function executeTool(
         taskDescription: `Created new deal: ${toolInput.property_address}`,
       };
     }
-    // Content tools — return context for Claude to generate the actual content
     case "draft_social_post":
     case "draft_listing_description":
     case "draft_email": {
@@ -265,7 +261,6 @@ async function executeTool(
         taskDescription: `Drafted ${toolName.replace("draft_", "")}: ${toolInput.post_type || toolInput.style || toolInput.email_type || ""}`.trim(),
       };
     }
-    // Contact tools
     case "search_contacts": {
       const q = `%${toolInput.query as string}%`;
       const { data } = await adminClient
@@ -315,6 +310,104 @@ async function executeTool(
   }
 }
 
+const TOOL_DESCRIPTIONS: Record<string, string> = {
+  get_active_deals: "Looking up your deals...",
+  get_deal_details: "Pulling deal details...",
+  update_deal: "Updating your deal...",
+  check_upcoming_deadlines: "Checking your deadlines...",
+  create_deal: "Creating a new deal...",
+  draft_social_post: "Drafting a social post...",
+  draft_listing_description: "Writing a listing description...",
+  draft_email: "Drafting an email...",
+  search_contacts: "Searching your contacts...",
+  add_contact: "Adding a new contact...",
+  update_contact: "Updating contact info...",
+};
+
+const encoder = new TextEncoder();
+
+function sendSSE(controller: ReadableStreamDefaultController, event: string, data: object) {
+  controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+}
+
+async function parseAnthropicStream(
+  response: Response,
+  controller: ReadableStreamDefaultController,
+  onText: (text: string) => void,
+  onToolUse: (tool: { id: string; name: string; input: Record<string, unknown> }) => void,
+): Promise<"end_turn" | "tool_use"> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let currentToolId = "";
+  let currentToolName = "";
+  let currentToolInput = "";
+  let stopReason: "end_turn" | "tool_use" = "end_turn";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const jsonStr = line.slice(6);
+      if (jsonStr === "[DONE]") continue;
+
+      let event;
+      try {
+        event = JSON.parse(jsonStr);
+      } catch {
+        continue;
+      }
+
+      switch (event.type) {
+        case "content_block_start":
+          if (event.content_block?.type === "tool_use") {
+            currentToolId = event.content_block.id;
+            currentToolName = event.content_block.name;
+            currentToolInput = "";
+          }
+          break;
+
+        case "content_block_delta":
+          if (event.delta?.type === "text_delta") {
+            const text = event.delta.text;
+            onText(text);
+            sendSSE(controller, "text_delta", { text });
+          } else if (event.delta?.type === "input_json_delta") {
+            currentToolInput += event.delta.partial_json;
+          }
+          break;
+
+        case "content_block_stop":
+          if (currentToolId) {
+            let parsedInput: Record<string, unknown> = {};
+            try {
+              if (currentToolInput) parsedInput = JSON.parse(currentToolInput);
+            } catch { /* empty input */ }
+            onToolUse({ id: currentToolId, name: currentToolName, input: parsedInput });
+            currentToolId = "";
+            currentToolName = "";
+            currentToolInput = "";
+          }
+          break;
+
+        case "message_delta":
+          if (event.delta?.stop_reason) {
+            stopReason = event.delta.stop_reason;
+          }
+          break;
+      }
+    }
+  }
+
+  return stopReason;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -353,7 +446,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Admin client for tool execution (bypasses RLS)
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -437,191 +529,198 @@ RULES:
       });
     }
 
-    // Initial API call with tools
-    let anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+    // Return SSE stream
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          let fullText = "";
+          const toolsUsed: { tool: string; description: string }[] = [];
+          let currentMessages = [...apiMessages];
+          let iterations = 0;
+
+          while (iterations < 5) {
+            iterations++;
+
+            const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: {
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "claude-sonnet-4-5-20250514",
+                system: systemPrompt,
+                messages: currentMessages,
+                tools: TOOLS,
+                max_tokens: 2048,
+                stream: true,
+              }),
+            });
+
+            if (!anthropicRes.ok) {
+              const errText = await anthropicRes.text();
+              console.error("Anthropic API error:", errText);
+              sendSSE(controller, "error", { message: "AI service error" });
+              controller.close();
+              return;
+            }
+
+            // Collect tool calls and text from this stream iteration
+            let iterationText = "";
+            const iterationToolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
+
+            const stopReason = await parseAnthropicStream(
+              anthropicRes,
+              controller,
+              (text) => {
+                iterationText += text;
+                fullText += text;
+              },
+              (tool) => {
+                iterationToolCalls.push(tool);
+              },
+            );
+
+            if (stopReason === "tool_use" && iterationToolCalls.length > 0) {
+              // Build assistant content blocks for the conversation
+              const assistantContent: unknown[] = [];
+              if (iterationText) {
+                assistantContent.push({ type: "text", text: iterationText });
+              }
+              for (const tool of iterationToolCalls) {
+                assistantContent.push({
+                  type: "tool_use",
+                  id: tool.id,
+                  name: tool.name,
+                  input: tool.input,
+                });
+              }
+
+              currentMessages.push({ role: "assistant", content: assistantContent });
+
+              // Execute tools and send status events
+              const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
+              for (const tool of iterationToolCalls) {
+                const desc = TOOL_DESCRIPTIONS[tool.name] || "Working on it...";
+                toolsUsed.push({ tool: tool.name, description: desc });
+                sendSSE(controller, "tool_status", { tool: tool.name, status: desc });
+
+                const { result, taskType, taskDescription } = await executeTool(
+                  tool.name,
+                  tool.input,
+                  userId,
+                  adminClient
+                );
+
+                // Log to task_history (non-blocking)
+                adminClient.from("task_history").insert({
+                  user_id: userId,
+                  task_type: taskType,
+                  description: taskDescription,
+                  metadata: { tool: tool.name, input: tool.input },
+                });
+
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: tool.id,
+                  content: JSON.stringify(result),
+                });
+              }
+
+              currentMessages.push({ role: "user", content: toolResults });
+              // Loop continues — will make another streaming call
+            } else {
+              // end_turn — we're done
+              break;
+            }
+          }
+
+          // Send done event
+          sendSSE(controller, "done", { tools_used: toolsUsed });
+
+          // Save assistant message
+          const assistantContent = fullText || "I wasn't able to generate a response.";
+          await Promise.all([
+            userClient.from("messages").insert({
+              conversation_id,
+              role: "assistant",
+              content: assistantContent,
+            }),
+            userClient.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation_id),
+          ]);
+
+          // Background memory extraction (fire and forget)
+          const lastMessages = [...history.slice(-3), { role: "user", content: message }, { role: "assistant", content: assistantContent }].slice(-4);
+          (async () => {
+            try {
+              const excerpt = lastMessages.map((m) => `${m.role}: ${m.content}`).join("\n\n");
+              const memRes = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "x-api-key": ANTHROPIC_API_KEY,
+                  "anthropic-version": "2023-06-01",
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: "claude-sonnet-4-5-20250514",
+                  system: "You extract important facts from conversations. Return ONLY a JSON array.",
+                  messages: [{
+                    role: "user",
+                    content: `Extract important facts about this real estate agent's business, clients, deals, or preferences from the following conversation excerpt. Only extract facts worth remembering for future conversations. Return ONLY a valid JSON array of objects with 'fact' (string) and 'category' (string) fields. Categories: client_preference, deal_info, business_preference, vendor_info, personal, other. If nothing worth remembering, return [].\n\nConversation:\n${excerpt}`,
+                  }],
+                  max_tokens: 512,
+                }),
+              });
+
+              if (!memRes.ok) {
+                console.error("Memory extraction API error:", await memRes.text());
+                return;
+              }
+
+              const memData = await memRes.json();
+              const rawText = memData.content?.[0]?.text || "[]";
+              const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+              if (!jsonMatch) return;
+
+              const facts = JSON.parse(jsonMatch[0]);
+              if (!Array.isArray(facts) || facts.length === 0) return;
+
+              const rows = facts
+                .filter((f: { fact?: string; category?: string }) => f.fact && f.category)
+                .map((f: { fact: string; category: string }) => ({
+                  user_id: userId,
+                  fact: f.fact,
+                  category: f.category,
+                  source_conversation_id: conversation_id,
+                }));
+
+              if (rows.length > 0) {
+                await adminClient.from("memory_facts").insert(rows);
+              }
+            } catch (err) {
+              console.error("Memory extraction failed (non-blocking):", err);
+            }
+          })();
+
+          controller.close();
+        } catch (err) {
+          console.error("Streaming error:", err);
+          try {
+            sendSSE(controller, "error", { message: "Internal server error" });
+          } catch { /* controller may be closed */ }
+          try { controller.close(); } catch { /* already closed */ }
+        }
       },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250514",
-        system: systemPrompt,
-        messages: apiMessages,
-        tools: TOOLS,
-        max_tokens: 2048,
-      }),
     });
 
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      console.error("Anthropic API error:", errText);
-      return new Response(JSON.stringify({ error: "AI service error" }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    let anthropicData = await anthropicRes.json();
-    let currentMessages = [...apiMessages];
-
-    const TOOL_DESCRIPTIONS: Record<string, string> = {
-      get_active_deals: "Looking up your deals...",
-      get_deal_details: "Pulling deal details...",
-      update_deal: "Updating your deal...",
-      check_upcoming_deadlines: "Checking your deadlines...",
-      create_deal: "Creating a new deal...",
-      draft_social_post: "Drafting a social post...",
-      draft_listing_description: "Writing a listing description...",
-      draft_email: "Drafting an email...",
-      search_contacts: "Searching your contacts...",
-      add_contact: "Adding a new contact...",
-      update_contact: "Updating contact info...",
-    };
-
-    const toolsUsed: { tool: string; description: string }[] = [];
-
-    // Tool use loop (handle up to 5 sequential tool calls)
-    let iterations = 0;
-    while (anthropicData.stop_reason === "tool_use" && iterations < 5) {
-      iterations++;
-
-      // Build the assistant message content (may contain text + tool_use blocks)
-      const assistantContent = anthropicData.content;
-      currentMessages.push({ role: "assistant", content: assistantContent });
-
-      // Process all tool_use blocks
-      const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
-      for (const block of assistantContent) {
-        if (block.type === "tool_use") {
-          toolsUsed.push({
-            tool: block.name,
-            description: TOOL_DESCRIPTIONS[block.name] || "Working on it...",
-          });
-          const { result, taskType, taskDescription } = await executeTool(
-            block.name,
-            block.input,
-            userId,
-            adminClient
-          );
-
-          // Log to task_history
-          await adminClient.from("task_history").insert({
-            user_id: userId,
-            task_type: taskType,
-            description: taskDescription,
-            metadata: { tool: block.name, input: block.input },
-          });
-
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: JSON.stringify(result),
-          });
-        }
-      }
-
-      currentMessages.push({ role: "user", content: toolResults });
-
-      // Follow-up API call
-      anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-5-20250514",
-          system: systemPrompt,
-          messages: currentMessages,
-          tools: TOOLS,
-          max_tokens: 2048,
-        }),
-      });
-
-      if (!anthropicRes.ok) {
-        const errText = await anthropicRes.text();
-        console.error("Anthropic follow-up error:", errText);
-        break;
-      }
-
-      anthropicData = await anthropicRes.json();
-    }
-
-    // Extract final text response
-    const textBlocks = (anthropicData.content || []).filter((b: { type: string }) => b.type === "text");
-    const assistantContent = textBlocks.map((b: { text: string }) => b.text).join("\n\n") || "I wasn't able to generate a response.";
-
-    // Save assistant message and update conversation
-    await Promise.all([
-      userClient.from("messages").insert({
-        conversation_id,
-        role: "assistant",
-        content: assistantContent,
-      }),
-      userClient.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation_id),
-    ]);
-
-    // Background memory extraction — don't block response
-    const lastMessages = [...history.slice(-3), { role: "user", content: message }, { role: "assistant", content: assistantContent }].slice(-4);
-    const memoryExtractionPromise = (async () => {
-      try {
-        const excerpt = lastMessages.map((m) => `${m.role}: ${m.content}`).join("\n\n");
-        const memRes = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-5-20250514",
-            system: "You extract important facts from conversations. Return ONLY a JSON array.",
-            messages: [{
-              role: "user",
-              content: `Extract important facts about this real estate agent's business, clients, deals, or preferences from the following conversation excerpt. Only extract facts worth remembering for future conversations. Return ONLY a valid JSON array of objects with 'fact' (string) and 'category' (string) fields. Categories: client_preference, deal_info, business_preference, vendor_info, personal, other. If nothing worth remembering, return [].\n\nConversation:\n${excerpt}`,
-            }],
-            max_tokens: 512,
-          }),
-        });
-
-        if (!memRes.ok) {
-          console.error("Memory extraction API error:", await memRes.text());
-          return;
-        }
-
-        const memData = await memRes.json();
-        const rawText = memData.content?.[0]?.text || "[]";
-        // Extract JSON array from response (handle markdown code blocks)
-        const jsonMatch = rawText.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) return;
-
-        const facts = JSON.parse(jsonMatch[0]);
-        if (!Array.isArray(facts) || facts.length === 0) return;
-
-        const rows = facts
-          .filter((f: { fact?: string; category?: string }) => f.fact && f.category)
-          .map((f: { fact: string; category: string }) => ({
-            user_id: userId,
-            fact: f.fact,
-            category: f.category,
-            source_conversation_id: conversation_id,
-          }));
-
-        if (rows.length > 0) {
-          await adminClient.from("memory_facts").insert(rows);
-        }
-      } catch (err) {
-        console.error("Memory extraction failed (non-blocking):", err);
-      }
-    })();
-
-    // Memory extraction runs in background — no await needed
-
-    return new Response(JSON.stringify({ response: assistantContent, tools_used: toolsUsed }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
     });
   } catch (err) {
     console.error("Chat function error:", err);
