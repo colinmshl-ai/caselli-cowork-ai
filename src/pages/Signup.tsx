@@ -55,7 +55,7 @@ const Signup = () => {
       <div className="w-full max-w-sm">
         <div className="mb-12 text-center">
           <h1 className="text-2xl tracking-tight text-foreground">
-            <span className="font-serif font-semibold">Caselli</span>{" "}
+            <span className="font-serif italic font-semibold">Caselli</span>{" "}
             <span className="font-sans font-light">Cowork</span>
           </h1>
         </div>
