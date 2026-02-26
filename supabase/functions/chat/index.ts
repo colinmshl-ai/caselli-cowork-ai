@@ -567,7 +567,7 @@ MULTI-ACTION BEHAVIOR:
                 "content-type": "application/json",
               },
               body: JSON.stringify({
-                model: "claude-sonnet-4-5-20250514",
+                model: "claude-sonnet-4-20250514",
                 system: systemPrompt,
                 messages: currentMessages,
                 tools: TOOLS,
@@ -699,7 +699,7 @@ MULTI-ACTION BEHAVIOR:
                   "content-type": "application/json",
                 },
                 body: JSON.stringify({
-                  model: "claude-sonnet-4-5-20250514",
+                  model: "claude-sonnet-4-20250514",
                   system: "You extract important facts from conversations. Return ONLY a JSON array.",
                   messages: [{
                     role: "user",
