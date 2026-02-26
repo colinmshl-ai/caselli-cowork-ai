@@ -544,6 +544,64 @@ RULES:
       userClient.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation_id),
     ]);
 
+    // Background memory extraction — don't block response
+    const lastMessages = [...history.slice(-3), { role: "user", content: message }, { role: "assistant", content: assistantContent }].slice(-4);
+    const memoryExtractionPromise = (async () => {
+      try {
+        const excerpt = lastMessages.map((m) => `${m.role}: ${m.content}`).join("\n\n");
+        const memRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-5-20250514",
+            system: "You extract important facts from conversations. Return ONLY a JSON array.",
+            messages: [{
+              role: "user",
+              content: `Extract important facts about this real estate agent's business, clients, deals, or preferences from the following conversation excerpt. Only extract facts worth remembering for future conversations. Return ONLY a valid JSON array of objects with 'fact' (string) and 'category' (string) fields. Categories: client_preference, deal_info, business_preference, vendor_info, personal, other. If nothing worth remembering, return [].\n\nConversation:\n${excerpt}`,
+            }],
+            max_tokens: 512,
+          }),
+        });
+
+        if (!memRes.ok) {
+          console.error("Memory extraction API error:", await memRes.text());
+          return;
+        }
+
+        const memData = await memRes.json();
+        const rawText = memData.content?.[0]?.text || "[]";
+        // Extract JSON array from response (handle markdown code blocks)
+        const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) return;
+
+        const facts = JSON.parse(jsonMatch[0]);
+        if (!Array.isArray(facts) || facts.length === 0) return;
+
+        const rows = facts
+          .filter((f: { fact?: string; category?: string }) => f.fact && f.category)
+          .map((f: { fact: string; category: string }) => ({
+            user_id: userId,
+            fact: f.fact,
+            category: f.category,
+            source_conversation_id: conversation_id,
+          }));
+
+        if (rows.length > 0) {
+          await adminClient.from("memory_facts").insert(rows);
+        }
+      } catch (err) {
+        console.error("Memory extraction failed (non-blocking):", err);
+      }
+    })();
+
+    // Use waitUntil-style: respond immediately, let extraction finish in background
+    // EdgeRuntime keeps the isolate alive for pending promises after response
+    memoryExtractionPromise;
+
     return new Response(JSON.stringify({ response: assistantContent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
