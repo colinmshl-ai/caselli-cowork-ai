@@ -42,7 +42,7 @@ const TOOLS = [
   },
   {
     name: "create_deal",
-    description: "Create a new deal when the agent mentions a new listing, buyer, or transaction.",
+    description: "Create a new deal when the agent mentions a new listing, buyer, or transaction. ALWAYS infer deal_type from context: if the agent says 'listing', 'listed', or 'seller' it is a seller deal. If they say 'buyer', 'looking for', or 'making an offer' it is a buyer deal. Default stage to 'lead' for new mentions, 'active_client' if they mention an existing relationship, 'under_contract' if they mention a signed contract. Extract list_price from any dollar amount mentioned.",
     input_schema: {
       type: "object",
       properties: {
@@ -59,7 +59,7 @@ const TOOLS = [
   },
   {
     name: "draft_social_post",
-    description: "Draft a social media post. Types: new_listing, just_sold, open_house, market_update, tip, testimonial. Always match the agent's brand voice. After drafting, ask: 'Want me to adjust anything, or is this good to go?'",
+    description: "Draft a social media post. Default to Instagram unless the agent specifies otherwise. ALWAYS include 5-8 relevant hashtags. Include emojis appropriate to the platform. Types: new_listing, just_sold, open_house, market_update, tip, testimonial. Match the agent's brand voice exactly. After drafting, ask: Want me to adjust anything or adapt this for another platform?",
     input_schema: {
       type: "object",
       properties: {
@@ -89,7 +89,7 @@ const TOOLS = [
   },
   {
     name: "draft_email",
-    description: "Draft an email. Types: follow_up, check_in, congratulations, introduction, status_update, vendor_coordination. Match brand voice. After drafting, ask: 'Want me to adjust anything, or is this good to go?'",
+    description: "Draft an email. Before drafting, ALWAYS use search_contacts to look up the recipient and pull their email address. Types: follow_up, check_in, congratulations, introduction, status_update, vendor_coordination. Match brand voice. Include proper email headers (To, Subject) in the output. After drafting, ask: Want me to adjust anything?",
     input_schema: {
       type: "object",
       properties: {
@@ -104,7 +104,7 @@ const TOOLS = [
   },
   {
     name: "search_contacts",
-    description: "Search contacts by name, email, or company.",
+    description: "Search contacts by name, email, or company. Use this PROACTIVELY before drafting emails or creating deals that mention a person by name. Return all matching results so the AI can reference the correct contact.",
     input_schema: {
       type: "object",
       properties: { query: { type: "string" } },
