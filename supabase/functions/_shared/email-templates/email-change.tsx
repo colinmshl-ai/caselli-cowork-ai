@@ -32,7 +32,7 @@ export const EmailChangeEmail = ({
     <Preview>Confirm your email change for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Text style={brand}>Caselli</Text>
+        <Text style={brand}>Caselli Cowork</Text>
         <Heading style={h1}>Confirm your email change</Heading>
         <Text style={text}>
           You requested to change your email from{' '}
@@ -81,7 +81,7 @@ const text = {
 }
 const link = { color: 'inherit', textDecoration: 'underline' }
 const button = {
-  backgroundColor: '#A1866F',
+  backgroundColor: '#E91E63',
   color: '#ffffff',
   fontSize: '14px',
   fontWeight: '500' as const,

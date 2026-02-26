@@ -30,7 +30,7 @@ export const InviteEmail = ({
     <Preview>You've been invited to join {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Text style={brand}>Caselli</Text>
+        <Text style={brand}>Caselli Cowork</Text>
         <Heading style={h1}>You've been invited</Heading>
         <Text style={text}>
           You've been invited to join{' '}
@@ -75,7 +75,7 @@ const text = {
 }
 const link = { color: 'inherit', textDecoration: 'underline' }
 const button = {
-  backgroundColor: '#A1866F',
+  backgroundColor: '#E91E63',
   color: '#ffffff',
   fontSize: '14px',
   fontWeight: '500' as const,

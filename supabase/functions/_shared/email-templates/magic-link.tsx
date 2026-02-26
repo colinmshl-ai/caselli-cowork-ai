@@ -27,7 +27,7 @@ export const MagicLinkEmail = ({
     <Preview>Your login link for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Text style={brand}>Caselli</Text>
+        <Text style={brand}>Caselli Cowork</Text>
         <Heading style={h1}>Your login link</Heading>
         <Text style={text}>
           Click below to sign in to {siteName}. This link expires shortly.
@@ -67,7 +67,7 @@ const text = {
   margin: '0 0 25px',
 }
 const button = {
-  backgroundColor: '#A1866F',
+  backgroundColor: '#E91E63',
   color: '#ffffff',
   fontSize: '14px',
   fontWeight: '500' as const,

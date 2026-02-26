@@ -32,7 +32,7 @@ export const SignupEmail = ({
     <Preview>Confirm your email for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Text style={brand}>Caselli</Text>
+        <Text style={brand}>Caselli Cowork</Text>
         <Heading style={h1}>Welcome — let's get you set up</Heading>
         <Text style={text}>
           Thanks for signing up for{' '}
@@ -81,7 +81,7 @@ const text = {
 }
 const link = { color: 'inherit', textDecoration: 'underline' }
 const button = {
-  backgroundColor: '#A1866F',
+  backgroundColor: '#E91E63',
   color: '#ffffff',
   fontSize: '14px',
   fontWeight: '500' as const,
