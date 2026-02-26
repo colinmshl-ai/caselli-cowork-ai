@@ -35,7 +35,7 @@ const plans = [
 
 const Wordmark = ({ className = "" }: { className?: string }) => (
   <span className={className}>
-    <span className="font-serif">Caselli</span>{" "}
+    <span className="font-serif italic">Caselli</span>{" "}
     <span className="font-sans font-light">Cowork</span>
   </span>
 );
