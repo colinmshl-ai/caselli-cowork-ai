@@ -57,6 +57,94 @@ const TOOLS = [
       required: ["property_address"],
     },
   },
+  // Content tools
+  {
+    name: "draft_social_post",
+    description: "Draft a social media post. Types: new_listing, just_sold, open_house, market_update, tip, testimonial. Always match the agent's brand voice. After drafting, ask: 'Want me to adjust anything, or is this good to go?'",
+    input_schema: {
+      type: "object",
+      properties: {
+        post_type: { type: "string" },
+        property_address: { type: "string" },
+        details: { type: "string" },
+        platform: { type: "string", enum: ["instagram", "facebook", "linkedin"] },
+      },
+      required: ["post_type"],
+    },
+  },
+  {
+    name: "draft_listing_description",
+    description: "Draft a listing description for MLS or marketing. Follow Fair Housing — property features only. After drafting, ask: 'Want me to adjust anything, or is this good to go?'",
+    input_schema: {
+      type: "object",
+      properties: {
+        property_address: { type: "string" },
+        bedrooms: { type: "number" },
+        bathrooms: { type: "number" },
+        sqft: { type: "number" },
+        features: { type: "string" },
+        style: { type: "string", enum: ["mls_short", "mls_full", "marketing"] },
+      },
+      required: ["property_address"],
+    },
+  },
+  {
+    name: "draft_email",
+    description: "Draft an email. Types: follow_up, check_in, congratulations, introduction, status_update, vendor_coordination. Match brand voice. After drafting, ask: 'Want me to adjust anything, or is this good to go?'",
+    input_schema: {
+      type: "object",
+      properties: {
+        email_type: { type: "string" },
+        recipient_name: { type: "string" },
+        recipient_role: { type: "string" },
+        context: { type: "string" },
+        deal_id: { type: "string" },
+      },
+      required: ["email_type", "recipient_name"],
+    },
+  },
+  // Contact tools
+  {
+    name: "search_contacts",
+    description: "Search contacts by name, email, or company.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string" } },
+      required: ["query"],
+    },
+  },
+  {
+    name: "add_contact",
+    description: "Add a new contact — lead, client, vendor, or other professional.",
+    input_schema: {
+      type: "object",
+      properties: {
+        full_name: { type: "string" },
+        email: { type: "string" },
+        phone: { type: "string" },
+        contact_type: { type: "string" },
+        company: { type: "string" },
+        notes: { type: "string" },
+      },
+      required: ["full_name"],
+    },
+  },
+  {
+    name: "update_contact",
+    description: "Update an existing contact's information.",
+    input_schema: {
+      type: "object",
+      properties: {
+        contact_id: { type: "string" },
+        email: { type: "string" },
+        phone: { type: "string" },
+        contact_type: { type: "string" },
+        company: { type: "string" },
+        notes: { type: "string" },
+      },
+      required: ["contact_id"],
+    },
+  },
 ];
 
 async function executeTool(
@@ -155,6 +243,71 @@ async function executeTool(
         result: error ? { error: error.message } : data,
         taskType: "deal_create",
         taskDescription: `Created new deal: ${toolInput.property_address}`,
+      };
+    }
+    // Content tools — return context for Claude to generate the actual content
+    case "draft_social_post":
+    case "draft_listing_description":
+    case "draft_email": {
+      let context: Record<string, unknown> = { success: true, ...toolInput };
+      if (toolInput.deal_id) {
+        const { data: deal } = await adminClient
+          .from("deals")
+          .select("*")
+          .eq("id", toolInput.deal_id as string)
+          .eq("user_id", userId)
+          .single();
+        if (deal) context.deal = deal;
+      }
+      return {
+        result: context,
+        taskType: "content_drafted",
+        taskDescription: `Drafted ${toolName.replace("draft_", "")}: ${toolInput.post_type || toolInput.style || toolInput.email_type || ""}`.trim(),
+      };
+    }
+    // Contact tools
+    case "search_contacts": {
+      const q = `%${toolInput.query as string}%`;
+      const { data } = await adminClient
+        .from("contacts")
+        .select("*")
+        .eq("user_id", userId)
+        .or(`full_name.ilike.${q},email.ilike.${q},company.ilike.${q}`);
+      return {
+        result: data || [],
+        taskType: "contact_lookup",
+        taskDescription: `Searched contacts for "${toolInput.query}"`,
+      };
+    }
+    case "add_contact": {
+      const { data, error } = await adminClient
+        .from("contacts")
+        .insert({ user_id: userId, ...toolInput })
+        .select()
+        .single();
+      return {
+        result: error ? { error: error.message } : data,
+        taskType: "contact_updated",
+        taskDescription: `Added contact: ${toolInput.full_name}`,
+      };
+    }
+    case "update_contact": {
+      const { contact_id, ...updates } = toolInput;
+      const cleanUpdates: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(updates)) {
+        if (v !== undefined && v !== null) cleanUpdates[k] = v;
+      }
+      const { data, error } = await adminClient
+        .from("contacts")
+        .update(cleanUpdates)
+        .eq("id", contact_id as string)
+        .eq("user_id", userId)
+        .select()
+        .single();
+      return {
+        result: error ? { error: error.message } : data,
+        taskType: "contact_updated",
+        taskDescription: `Updated contact: ${data?.full_name || contact_id}`,
       };
     }
     default:
@@ -258,13 +411,15 @@ YOUR CAPABILITIES:
 - Help with time management and task planning
 - Answer real estate questions about contracts and processes
 - Look up, create, and update deals in the agent's pipeline using your tools
+- Search, add, and update contacts in the agent's CRM using your tools
+- Draft content (social posts, listing descriptions, emails) using your tools — always present drafts formatted and ask "Want me to adjust anything, or is this good to go?"
 
 RULES:
 - Always follow Fair Housing guidelines — no references to protected classes in any content
 - When writing listing descriptions, focus only on property features
 - If asked for legal advice, recommend consulting a broker or attorney
 - If asked something outside your expertise, say so honestly
-- Use your tools proactively when the conversation is about deals, deadlines, or pipeline`;
+- Use your tools proactively when the conversation is about deals, deadlines, contacts, or content`;
 
     const apiMessages = [
       ...history.map((m: { role: string; content: string }) => ({
