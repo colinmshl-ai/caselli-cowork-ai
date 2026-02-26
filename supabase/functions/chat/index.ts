@@ -466,6 +466,22 @@ RULES:
     let anthropicData = await anthropicRes.json();
     let currentMessages = [...apiMessages];
 
+    const TOOL_DESCRIPTIONS: Record<string, string> = {
+      get_active_deals: "Looking up your deals...",
+      get_deal_details: "Pulling deal details...",
+      update_deal: "Updating your deal...",
+      check_upcoming_deadlines: "Checking your deadlines...",
+      create_deal: "Creating a new deal...",
+      draft_social_post: "Drafting a social post...",
+      draft_listing_description: "Writing a listing description...",
+      draft_email: "Drafting an email...",
+      search_contacts: "Searching your contacts...",
+      add_contact: "Adding a new contact...",
+      update_contact: "Updating contact info...",
+    };
+
+    const toolsUsed: { tool: string; description: string }[] = [];
+
     // Tool use loop (handle up to 5 sequential tool calls)
     let iterations = 0;
     while (anthropicData.stop_reason === "tool_use" && iterations < 5) {
@@ -479,6 +495,10 @@ RULES:
       const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
       for (const block of assistantContent) {
         if (block.type === "tool_use") {
+          toolsUsed.push({
+            tool: block.name,
+            description: TOOL_DESCRIPTIONS[block.name] || "Working on it...",
+          });
           const { result, taskType, taskDescription } = await executeTool(
             block.name,
             block.input,
@@ -600,7 +620,7 @@ RULES:
 
     // Memory extraction runs in background — no await needed
 
-    return new Response(JSON.stringify({ response: assistantContent }), {
+    return new Response(JSON.stringify({ response: assistantContent, tools_used: toolsUsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

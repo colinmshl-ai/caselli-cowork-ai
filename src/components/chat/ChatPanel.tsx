@@ -12,10 +12,10 @@ interface ChatPanelProps {
   sendMessageRef: MutableRefObject<((msg: string) => void) | null>;
 }
 
-const TypingIndicator = () => (
+const TypingIndicator = ({ status }: { status: string }) => (
   <div className="flex items-center gap-1 px-2 py-1">
     <span className="text-sm text-muted-foreground animate-pulse">
-      Caselli is thinking…
+      {status}
     </span>
   </div>
 );
@@ -29,7 +29,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
   const [activeConvoId, setActiveConvoId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
-  const [typing, setTyping] = useState(false);
+  const [typingStatus, setTypingStatus] = useState("");
   const [showConvos, setShowConvos] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -101,7 +101,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typing]);
+  }, [messages, typingStatus]);
 
   // Handle pending prompt
   useEffect(() => {
@@ -143,13 +143,20 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
     resetTextarea();
 
     // Call AI edge function
-    setTyping(true);
+    setTypingStatus("Thinking...");
     try {
       const { data: fnData, error: fnError } = await supabase.functions.invoke("chat", {
         body: { conversation_id: convoId, message: text.trim() },
       });
 
       if (fnError) throw fnError;
+
+      // Flash tool descriptions sequentially
+      const toolsUsed: { tool: string; description: string }[] = fnData?.tools_used || [];
+      for (const t of toolsUsed) {
+        setTypingStatus(t.description);
+        await new Promise((r) => setTimeout(r, 600));
+      }
 
       const assistantContent = fnData?.response || "Sorry, I couldn't generate a response.";
       // Fetch the saved assistant message from DB to get proper id/timestamps
@@ -168,7 +175,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
       console.error("Chat error:", err);
       setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: "Something went wrong. Please try again." }]);
     } finally {
-      setTyping(false);
+      setTypingStatus("");
     }
   }, [activeConvoId, user, queryClient]);
 
@@ -266,7 +273,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.length === 0 && !typing && (
+        {messages.length === 0 && !typingStatus && (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground">Start a conversation with Caselli</p>
           </div>
@@ -297,12 +304,12 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef }: ChatPane
           </div>
         ))}
 
-        {typing && (
+        {typingStatus && (
           <div className="flex items-start">
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground mr-2 mt-0.5">
               C
             </div>
-            <TypingIndicator />
+            <TypingIndicator status={typingStatus} />
           </div>
         )}
 
