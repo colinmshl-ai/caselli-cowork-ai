@@ -452,15 +452,19 @@ Deno.serve(async (req) => {
     );
 
     // Fetch context in parallel
-    const [profileRes, memoryRes, historyRes] = await Promise.all([
+    const [profileRes, memoryRes, historyRes, recentActivityRes, lastConvoRes] = await Promise.all([
       userClient.from("business_profiles").select("*").eq("user_id", userId).maybeSingle(),
       userClient.from("memory_facts").select("fact").eq("user_id", userId).order("created_at", { ascending: false }).limit(25),
-      userClient.from("messages").select("role, content, metadata").eq("conversation_id", conversation_id).order("created_at", { ascending: true }),
+      userClient.from("messages").select("role, content, metadata, tool_results").eq("conversation_id", conversation_id).order("created_at", { ascending: true }),
+      userClient.from("task_history").select("task_type, description, metadata, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(5),
+      userClient.from("conversations").select("title, id").eq("user_id", userId).order("updated_at", { ascending: false }).limit(1),
     ]);
 
     const profile = profileRes.data;
     const memoryFacts = memoryRes.data || [];
     const history = historyRes.data || [];
+    const recentActivity = recentActivityRes.data || [];
+    const lastConvo = lastConvoRes.data?.[0];
 
     // Build system prompt
     let systemPrompt = `You are Caselli, a sharp, proactive real estate AI coworker. You anticipate needs, not just respond to requests. When an agent mentions a listing, you automatically think about what marketing materials they'll need, what deadlines to track, and who to notify. You speak in the agent's chosen brand tone at all times.\n\n`;
@@ -487,6 +491,22 @@ Deno.serve(async (req) => {
 
     if (memoryFacts.length > 0) {
       systemPrompt += `THINGS I REMEMBER FROM PAST CONVERSATIONS:\n${memoryFacts.map((m) => `- ${m.fact}`).join("\n")}\n\n`;
+    }
+
+    // Add recent activity context for cross-conversation continuity
+    if (recentActivity.length > 0) {
+      systemPrompt += `RECENT ACTIVITY (last actions across all conversations):\n`;
+      for (const activity of recentActivity) {
+        const meta = activity.metadata as Record<string, unknown> | null;
+        const toolName = meta?.tool || activity.task_type;
+        const inputSummary = meta?.input ? Object.entries(meta.input as Record<string, unknown>).filter(([, v]) => v).map(([k, v]) => `${k}="${v}"`).join(", ") : "";
+        systemPrompt += `- ${activity.description || toolName}${inputSummary ? ` (${inputSummary})` : ""}\n`;
+      }
+      systemPrompt += `\n`;
+    }
+
+    if (lastConvo && lastConvo.id !== conversation_id && lastConvo.title) {
+      systemPrompt += `LAST CONVERSATION CONTEXT: The user's most recent conversation was titled "${lastConvo.title}". Reference this naturally if relevant.\n\n`;
     }
 
     systemPrompt += `YOUR PERSONALITY AND BEHAVIOR:
@@ -534,10 +554,14 @@ MULTI-ACTION BEHAVIOR:
 - After completing a chain of actions, summarize everything you did in a clear list.`;
 
     const apiMessages = [
-      ...history.map((m: { role: string; content: string; metadata?: { tools?: { tool: string; input: Record<string, unknown> }[] } }) => {
+      ...history.map((m: { role: string; content: string; metadata?: { tools?: { tool: string; input: Record<string, unknown>; result_summary?: string }[] } }) => {
         let content = m.content;
         if (m.role === "assistant" && m.metadata?.tools) {
-          const toolSummary = m.metadata.tools.map((t: { tool: string }) => `[Used ${t.tool}]`).join(" ");
+          const toolSummary = m.metadata.tools.map((t: { tool: string; input: Record<string, unknown>; result_summary?: string }) => {
+            const inputParts = Object.entries(t.input || {}).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => `${k}="${v}"`).join(", ");
+            const resultPart = t.result_summary ? ` → ${t.result_summary}` : "";
+            return `[Used ${t.tool}: ${inputParts}${resultPart}]`;
+          }).join("\n");
           content = toolSummary + "\n" + content;
         }
         return { role: m.role === "assistant" ? "assistant" : "user", content };
@@ -682,9 +706,25 @@ MULTI-ACTION BEHAVIOR:
           // Send done event
           sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId });
 
-          // Save assistant message
+          // Save assistant message with enriched tool metadata
           const assistantContent = fullText || "I wasn't able to generate a response.";
-          const metadata = toolCallLog.length > 0 ? { tools: toolCallLog.map(t => ({ tool: t.tool, input: t.input })) } : null;
+          const metadata = toolCallLog.length > 0 ? {
+            tools: toolCallLog.map(t => {
+              // Create a concise result summary for history context
+              let resultSummary = "";
+              if (t.result && typeof t.result === "object" && !Array.isArray(t.result)) {
+                const r = t.result as Record<string, unknown>;
+                if (r.error) resultSummary = `error: ${r.error}`;
+                else if (r.id && r.property_address) resultSummary = `created deal ${(r.id as string).slice(0, 8)} at ${r.property_address}`;
+                else if (r.id && r.full_name) resultSummary = `added contact ${r.full_name}`;
+                else if (r.id) resultSummary = `id=${(r.id as string).slice(0, 8)}`;
+                else if (r.success) resultSummary = "success";
+              } else if (Array.isArray(t.result)) {
+                resultSummary = `${t.result.length} result(s)`;
+              }
+              return { tool: t.tool, input: t.input, result_summary: resultSummary || undefined };
+            })
+          } : null;
           await Promise.all([
             userClient.from("messages").insert({
               conversation_id,
