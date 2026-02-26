@@ -317,8 +317,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       if (contentType.includes("text/event-stream") && response.body) {
         // SSE streaming path
         const placeholderId = crypto.randomUUID();
+        let firstDeltaReceived = false;
         setMessages((prev) => [...prev, { id: placeholderId, role: "assistant", content: "" }]);
-        setTypingStatus("");
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -354,6 +354,10 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
             switch (evt.event) {
               case "text_delta": {
                 const parsed = JSON.parse(evt.data);
+                if (!firstDeltaReceived) {
+                  firstDeltaReceived = true;
+                  setTypingStatus("");
+                }
                 streamingContentRef.current += parsed.text;
                 scheduleUpdate();
                 break;
@@ -560,15 +564,31 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
         {messages.length === 0 && !typingStatus && (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center justify-center h-full gap-6">
             <p className="text-sm text-muted-foreground">Start a conversation with Caselli Cowork</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-md w-full">
+              {[
+                "I just got a new listing at...",
+                "Draft a social post for...",
+                "Give me a pipeline overview",
+                "Help me follow up with a client",
+              ].map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => sendMessage(prompt)}
+                  className="text-left text-sm px-4 py-3 rounded-lg border border-border bg-card hover:bg-secondary/50 text-foreground transition-colors"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
-        {messages.map((m) => (
-          <div key={m.id} className={`flex animate-fade-in-up ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+        {messages.map((m, idx) => (
+          <div key={m.id} className={`flex animate-fade-in-up ${m.role === "user" ? "justify-end" : "justify-start"} ${m.role === "assistant" && idx > 0 && messages[idx - 1]?.role === "user" ? "mt-2" : ""}`}>
             {m.role === "assistant" && (
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground mr-2 mt-0.5">
                 C
@@ -586,7 +606,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                   <EntityLinker dealId={m.lastDealId} contactId={m.lastContactId}>
                     <ContentCardRenderer content={m.content} onAction={sendMessage} />
                   </EntityLinker>
-                  <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute -top-1 -right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                     <CopyButton text={m.content} />
                   </div>
                 </>
@@ -596,6 +616,26 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
             </div>
           </div>
         ))}
+
+        {/* Starter prompts below welcome message when no user messages yet */}
+        {messages.length > 0 && messages.every((m) => m.role === "assistant") && !typingStatus && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-md">
+            {[
+              "I just got a new listing at...",
+              "Draft a social post for...",
+              "Give me a pipeline overview",
+              "Help me follow up with a client",
+            ].map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => sendMessage(prompt)}
+                className="text-left text-sm px-4 py-3 rounded-lg border border-border bg-card hover:bg-secondary/50 text-foreground transition-colors"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        )}
 
         {(typingStatus || completedTools.length > 0) && (
           <div className="flex items-start">
@@ -633,11 +673,12 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim()}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
           >
-            <ArrowUp size={15} />
+            <ArrowUp size={16} />
           </button>
         </div>
+        <p className="text-[10px] text-muted-foreground text-center mt-1.5">Press Enter to send · Shift+Enter for new line</p>
       </div>
     </>
   );
