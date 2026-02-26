@@ -391,6 +391,13 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 }
                 break;
               }
+              case "title_update": {
+                const parsed = JSON.parse(evt.data);
+                if (parsed.title) {
+                  queryClient.invalidateQueries({ queryKey: ["conversations"] });
+                }
+                break;
+              }
               case "error": {
                 const parsed = JSON.parse(evt.data);
                 errorSeen = true;

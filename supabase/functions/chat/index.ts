@@ -740,9 +740,6 @@ MULTI-ACTION BEHAVIOR:
             }
           }
 
-          // Send done event
-          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId });
-
           // Save assistant message with enriched tool metadata
           const assistantContent = fullText || "I wasn't able to generate a response.";
           const metadata = toolCallLog.length > 0 ? {
@@ -771,6 +768,44 @@ MULTI-ACTION BEHAVIOR:
             }),
             userClient.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation_id),
           ]);
+
+          // Auto-generate conversation title for first message (awaited so SSE arrives before close)
+          const isFirstMessage = history.length <= 1;
+          if (isFirstMessage) {
+            try {
+              const summarySnippet = assistantContent.slice(0, 100);
+              const titleRes = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "x-api-key": ANTHROPIC_API_KEY,
+                  "anthropic-version": "2023-06-01",
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: "claude-haiku-3-5-20241022",
+                  messages: [{
+                    role: "user",
+                    content: `Generate a short (3-6 word) conversation title for this exchange. Return only the title, no quotes or punctuation. User: ${message}. Assistant summary: ${summarySnippet}`,
+                  }],
+                  max_tokens: 20,
+                }),
+              });
+              if (titleRes.ok) {
+                const titleData = await titleRes.json();
+                const newTitle = (titleData.content?.[0]?.text || "").trim();
+                if (newTitle) {
+                  await adminClient.from("conversations").update({ title: newTitle }).eq("id", conversation_id);
+                  sendSSE(controller, "title_update", { title: newTitle });
+                }
+              }
+            } catch (err) {
+              console.error("Title generation failed (non-blocking):", err);
+            }
+          }
+
+          // Send done event
+          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId });
+
 
           // Background memory extraction (fire and forget)
           // Only run if user message is substantive and assistant used tools
