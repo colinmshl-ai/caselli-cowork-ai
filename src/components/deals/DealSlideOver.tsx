@@ -185,6 +185,9 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
 
       {/* Panel */}
       <div className="fixed right-0 top-0 bottom-0 z-50 w-full md:max-w-[480px] overflow-y-auto bg-background border-l border-border">
+        <div className="flex justify-center pt-2 md:hidden">
+          <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
+        </div>
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-sm font-semibold text-foreground">
             {deal ? "Edit Deal" : "New Deal"}

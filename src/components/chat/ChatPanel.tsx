@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, MutableRefObject } from "react";
+import { useState, useEffect, useRef, useCallback, MutableRefObject, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -78,6 +78,19 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialized = useRef(false);
   const welcomeSent = useRef(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Mobile keyboard handling via visualViewport
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const kh = Math.max(0, window.innerHeight - vv.height);
+      setKeyboardHeight(kh);
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   // Fetch conversations
   const { data: conversations = [], isSuccess: convosLoaded } = useQuery({
@@ -312,7 +325,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
         {messages.length === 0 && !typingStatus && (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground">Start a conversation with Caselli</p>
@@ -360,7 +373,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       </div>
 
       {/* Input */}
-      <div className="sticky bottom-0 z-10 border-t border-border bg-background px-4 py-3">
+      <div className="sticky bottom-0 z-10 border-t border-border bg-background px-4 py-3 pb-safe">
         <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}

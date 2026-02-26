@@ -78,12 +78,12 @@ const AppLayout = () => {
       </nav>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col min-w-0 pb-14 md:pb-0">
+      <main className="flex-1 flex flex-col min-w-0 pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
         <Outlet />
       </main>
 
       {/* Mobile bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background h-14">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background h-14 pb-safe">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
