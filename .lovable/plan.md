@@ -1,20 +1,33 @@
 
 
-# Replace Static Welcome with Dynamic Morning Briefing
+# Store Structured Tool Results Alongside Message Content
 
-## Changes — `src/components/chat/ChatPanel.tsx` only
+## Changes
 
-### 1. Delete `WELCOME_TEMPLATE` constant (lines 39-40)
-Remove the static template string entirely.
+### 1. Database migration
+Add `metadata jsonb` column to `messages` table:
+```sql
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT null;
+```
 
-### 2. Replace `sendWelcomeMessage` function (lines 142-171)
-Replace with a dynamic version that:
-- Fetches user's active deals (excluding closed/fell_through) and recent task history in parallel
-- Builds a time-of-day greeting (morning/afternoon/evening)
-- For new users (no deals/tasks): shows the original capability list
-- For returning users: shows pipeline count, flags urgent deadlines within 3 days (closing, inspection, financing, appraisal), and prompts for focus
-- Creates conversation titled with the greeting + "briefing"
+### 2. `supabase/functions/chat/index.ts` — 4 edits
 
-## Files Modified: 1
-- `src/components/chat/ChatPanel.tsx`
+**A. Track tool calls (after line 548, near `toolsUsed` declaration):**
+Add `toolCallLog` array to capture tool name, input, and result for each execution.
+
+**B. Push to log after `executeTool` returns (after line 630):**
+Append `{ tool: tool.name, input: tool.input, result }` to `toolCallLog`.
+
+**C. Save metadata with message (lines 670-678):**
+Build metadata from `toolCallLog` (only tool names + inputs to keep size manageable) and include in the message insert.
+
+**D. Include metadata in history query (line 458):**
+Change select from `"role, content"` to `"role, content, metadata"`.
+
+**E. Enrich apiMessages with tool context (lines 527-533):**
+When building messages for the AI, prepend `[Used tool_name]` summaries to assistant messages that have metadata.
+
+### Files modified: 1 file + 1 migration
+- `supabase/functions/chat/index.ts`
+- Database migration for `metadata` column
 
