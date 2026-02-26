@@ -736,57 +736,72 @@ MULTI-ACTION BEHAVIOR:
           ]);
 
           // Background memory extraction (fire and forget)
-          const lastMessages = [...history.slice(-3), { role: "user", content: message }, { role: "assistant", content: assistantContent }].slice(-4);
-          (async () => {
-            try {
-              const excerpt = lastMessages.map((m) => `${m.role}: ${m.content}`).join("\n\n");
-              const memRes = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                headers: {
-                  "x-api-key": ANTHROPIC_API_KEY,
-                  "anthropic-version": "2023-06-01",
-                  "content-type": "application/json",
-                },
-                body: JSON.stringify({
-                  model: "claude-sonnet-4-20250514",
-                  system: "You extract important facts from conversations. Return ONLY a JSON array.",
-                  messages: [{
-                    role: "user",
-                    content: `Extract important facts about this real estate agent's business, clients, deals, or preferences from the following conversation excerpt. Only extract facts worth remembering for future conversations. Return ONLY a valid JSON array of objects with 'fact' (string) and 'category' (string) fields. Categories: client_preference, deal_info, business_preference, vendor_info, personal, other. If nothing worth remembering, return [].\n\nConversation:\n${excerpt}`,
-                  }],
-                  max_tokens: 512,
-                }),
-              });
+          // Only run if user message is substantive and assistant used tools
+          const shouldExtractMemory = message.length > 20 && toolCallLog.length > 0;
+          if (shouldExtractMemory) {
+            const lastMessages = [...history.slice(-3), { role: "user", content: message }, { role: "assistant", content: assistantContent }].slice(-4);
+            (async () => {
+              try {
+                const excerpt = lastMessages.map((m) => `${m.role}: ${m.content}`).join("\n\n");
+                const memRes = await fetch("https://api.anthropic.com/v1/messages", {
+                  method: "POST",
+                  headers: {
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    model: "claude-haiku-3-5-20241022",
+                    system: "You extract important facts from conversations. Return ONLY a JSON array.",
+                    messages: [{
+                      role: "user",
+                      content: `Extract important facts about this real estate agent's business, clients, deals, or preferences from the following conversation excerpt. Only extract facts worth remembering for future conversations. Return ONLY a valid JSON array of objects with 'fact' (string) and 'category' (string) fields. Categories: client_preference, deal_info, business_preference, vendor_info, personal, other. If nothing worth remembering, return [].\n\nConversation:\n${excerpt}`,
+                    }],
+                    max_tokens: 256,
+                  }),
+                });
 
-              if (!memRes.ok) {
-                console.error("Memory extraction API error:", await memRes.text());
-                return;
+                if (!memRes.ok) {
+                  console.error("Memory extraction API error:", await memRes.text());
+                  return;
+                }
+
+                const memData = await memRes.json();
+                const rawText = memData.content?.[0]?.text || "[]";
+                const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+                if (!jsonMatch) return;
+
+                const facts = JSON.parse(jsonMatch[0]);
+                if (!Array.isArray(facts) || facts.length === 0) return;
+
+                // Deduplicate against existing facts
+                const { data: existingFacts } = await adminClient
+                  .from("memory_facts")
+                  .select("fact")
+                  .eq("user_id", userId);
+                const existingTexts = (existingFacts || []).map((f: { fact: string }) => f.fact.toLowerCase());
+
+                const rows = facts
+                  .filter((f: { fact?: string; category?: string }) => f.fact && f.category)
+                  .filter((f: { fact: string }) => {
+                    const lower = f.fact.toLowerCase();
+                    return !existingTexts.some((existing: string) => existing.includes(lower) || lower.includes(existing));
+                  })
+                  .map((f: { fact: string; category: string }) => ({
+                    user_id: userId,
+                    fact: f.fact,
+                    category: f.category,
+                    source_conversation_id: conversation_id,
+                  }));
+
+                if (rows.length > 0) {
+                  await adminClient.from("memory_facts").insert(rows);
+                }
+              } catch (err) {
+                console.error("Memory extraction failed (non-blocking):", err);
               }
-
-              const memData = await memRes.json();
-              const rawText = memData.content?.[0]?.text || "[]";
-              const jsonMatch = rawText.match(/\[[\s\S]*\]/);
-              if (!jsonMatch) return;
-
-              const facts = JSON.parse(jsonMatch[0]);
-              if (!Array.isArray(facts) || facts.length === 0) return;
-
-              const rows = facts
-                .filter((f: { fact?: string; category?: string }) => f.fact && f.category)
-                .map((f: { fact: string; category: string }) => ({
-                  user_id: userId,
-                  fact: f.fact,
-                  category: f.category,
-                  source_conversation_id: conversation_id,
-                }));
-
-              if (rows.length > 0) {
-                await adminClient.from("memory_facts").insert(rows);
-              }
-            } catch (err) {
-              console.error("Memory extraction failed (non-blocking):", err);
-            }
-          })();
+            })();
+          }
 
           controller.close();
         } catch (err) {
