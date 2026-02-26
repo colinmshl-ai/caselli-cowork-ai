@@ -115,19 +115,10 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
       setAppraisalDeadline(deal.appraisal_deadline || "");
       setNotes(deal.notes || "");
     } else {
-      setPropertyAddress("");
-      setClientName("");
-      setClientEmail("");
-      setClientPhone("");
-      setDealType("buyer");
-      setStage("lead");
-      setListPrice("");
-      setContractPrice("");
-      setClosingDate("");
-      setInspectionDeadline("");
-      setFinancingDeadline("");
-      setAppraisalDeadline("");
-      setNotes("");
+      setPropertyAddress(""); setClientName(""); setClientEmail(""); setClientPhone("");
+      setDealType("buyer"); setStage("lead"); setListPrice(""); setContractPrice("");
+      setClosingDate(""); setInspectionDeadline(""); setFinancingDeadline("");
+      setAppraisalDeadline(""); setNotes("");
     }
   }, [deal, open]);
 
@@ -173,18 +164,24 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
     setSaving(false);
   };
 
-  if (!open) return null;
-
   return (
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 z-40 bg-foreground/10"
+        className={cn(
+          "fixed inset-0 z-40 bg-foreground/10 transition-opacity duration-200",
+          open ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full md:max-w-[480px] overflow-y-auto bg-background border-l border-border">
+      <div
+        className={cn(
+          "fixed right-0 top-0 bottom-0 z-50 w-full md:max-w-[480px] overflow-y-auto bg-background border-l border-border transition-transform duration-300 ease-out",
+          open ? "translate-x-0" : "translate-x-full"
+        )}
+      >
         <div className="flex justify-center pt-2 md:hidden">
           <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
         </div>
@@ -198,38 +195,14 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
         </div>
 
         <div className="space-y-4 px-5 py-5">
-          <input
-            type="text"
-            placeholder="Property address *"
-            value={propertyAddress}
-            onChange={(e) => setPropertyAddress(e.target.value)}
-            className={inputClass}
-          />
+          <input type="text" placeholder="Property address *" value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} className={inputClass} />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="Client name"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              className={inputClass}
-            />
-            <input
-              type="email"
-              placeholder="Client email"
-              value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
-              className={inputClass}
-            />
+            <input type="text" placeholder="Client name" value={clientName} onChange={(e) => setClientName(e.target.value)} className={inputClass} />
+            <input type="email" placeholder="Client email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} className={inputClass} />
           </div>
 
-          <input
-            type="tel"
-            placeholder="Client phone"
-            value={clientPhone}
-            onChange={(e) => setClientPhone(e.target.value)}
-            className={inputClass}
-          />
+          <input type="tel" placeholder="Client phone" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className={inputClass} />
 
           {/* Deal type toggle */}
           <div>
@@ -276,26 +249,14 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
               <label className="text-xs font-medium text-muted-foreground mb-1 block">List price</label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">$</span>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={listPrice}
-                  onChange={(e) => setListPrice(e.target.value)}
-                  className={cn(inputClass, "pl-7")}
-                />
+                <input type="number" placeholder="0" value={listPrice} onChange={(e) => setListPrice(e.target.value)} className={cn(inputClass, "pl-7")} />
               </div>
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Contract price</label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">$</span>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={contractPrice}
-                  onChange={(e) => setContractPrice(e.target.value)}
-                  className={cn(inputClass, "pl-7")}
-                />
+                <input type="number" placeholder="0" value={contractPrice} onChange={(e) => setContractPrice(e.target.value)} className={cn(inputClass, "pl-7")} />
               </div>
             </div>
           </div>
@@ -311,27 +272,14 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
           </div>
 
           {/* Notes */}
-          <textarea
-            placeholder="Notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            className={cn(inputClass, "resize-none")}
-          />
+          <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} className={cn(inputClass, "resize-none")} />
 
           {/* Actions */}
           <div className="flex items-center gap-4 pt-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 rounded-md bg-primary min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
+            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-md bg-primary min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
               {saving ? "Saving…" : "Save"}
             </button>
-            <button
-              onClick={onClose}
-              className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <button onClick={onClose} className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground transition-colors">
               Cancel
             </button>
           </div>
