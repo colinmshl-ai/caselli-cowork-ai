@@ -1,49 +1,30 @@
 
 
-# Improve Multi-Tool Response Display in Chat
+# Add Follow-Up Suggestion Chips Below AI Responses
 
 ## Changes
 
-### 1. `src/components/chat/ChatPanel.tsx` — Improve tool status pills + clickable entity links
+### 1. New file: `src/components/chat/SuggestionChips.tsx`
+Component that maps a conversation context (last tool used, topic) to 2-3 contextual suggestion chips:
 
-**Tool status pills (lines 22-37):** Redesign `TypingIndicator` to show pill/chip badges instead of plain text:
-- Completed tools: green-tinted pill with `✓` prefix, e.g. `✓ Deal created`
-- Active tool: pulsing primary-tinted pill with spinner dots, e.g. `Creating deal...`
-- Style: `inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs bg-green-50 text-green-700` for completed, `bg-primary/10 text-primary` for active
+- **Deal created** (`create_deal`): "Draft listing description", "Create social media campaign", "Set up deadline alerts"
+- **Social post drafted** (`draft_social_post`): "Adapt for Facebook", "Write a matching email blast", "Create a LinkedIn version"
+- **Email drafted** (`draft_email`): "Draft a follow-up for next week", "Create a phone script version", "Add recipient to contacts"
+- **Pipeline/overview** (`get_deals`, topic=deals): "Update deal stages", "Draft status emails to all clients", "Review this week's deadlines"
+- **Contact added** (`add_contact`): "Draft intro email", "Create a deal for this contact"
+- **General fallback**: "Show my active deals", "Draft a social post", "Check this week's deadlines"
 
-**Clickable entity references in assistant messages (lines 541-547):**
-- After `ContentCardRenderer`, post-process the rendered content to find deal/contact names and wrap them with `<Link>` to `/deals` or `/contacts`
-- Simpler approach: add a new `EntityLinker` wrapper component that uses regex to detect patterns like deal addresses or contact names from the conversation context, and replaces them with clickable links
-- Since deals/contacts pages use slide-overs (no individual routes), link to `/deals?highlight=<id>` and `/contacts?highlight=<id>` using IDs from the `done` SSE event
+Style: `border border-border rounded-full px-3 py-1.5 text-xs hover:bg-secondary transition-colors` — outlined pill buttons in a flex-wrap row.
 
-**Store entity IDs on messages (line 362-378):**
-- After streaming completes, attach `lastDealId` and `lastContactId` from the `done` event payload to the message state so `EntityLinker` can use them
+Props: `lastToolUsed?: string`, `topic?: string`, `onSend: (msg: string) => void`
 
-### 2. `src/components/chat/ContentCardRenderer.tsx` — Split multi-content blocks with dividers
+### 2. Update `src/components/chat/ChatPanel.tsx`
+- Import `SuggestionChips`
+- Track `lastToolUsed` in component state, set it after streaming completes from `toolsUsed` or conversation context
+- Render `<SuggestionChips>` between the messages scroll area and the input box (inside the sticky input container, above the textarea), only when not currently streaming and messages exist
+- When a chip is clicked, call `sendMessage(chipText)` and clear the chips
 
-Update the renderer to detect when content contains **multiple** content types (e.g., intro text + social post + email) and split them with `<Separator />` dividers:
-- Split content on `---` or double newlines between distinct content sections
-- Detect each section independently and render the appropriate card
-- Add `<Separator className="my-3" />` between sections
-- Wrap each card section in a div with `animate-fade-in-up` and staggered `animation-delay`
-
-### 3. `src/components/chat/SocialPostCard.tsx`, `EmailCard.tsx`, `ListingCard.tsx` — Add entrance animation
-
-Wrap each card's root div with the `animate-fade-in-up` class (already defined in tailwind config).
-
-### 4. New: `src/components/chat/EntityLinker.tsx` — Clickable entity names
-
-Small component that:
-- Receives `content` (ReactNode), `dealId`, `contactId`
-- Wraps the rendered output and adds click handlers on elements matching deal/contact patterns
-- Simpler implementation: just add small clickable badges below the message like `🏠 View deal` / `👤 View contact` when IDs are present, linking to `/deals?highlight=<id>` and `/contacts?highlight=<id>`
-
-## Files modified: 5
-- `src/components/chat/ChatPanel.tsx` — pill-styled tool indicators, entity ID tracking on messages, entity link badges
-- `src/components/chat/ContentCardRenderer.tsx` — multi-section splitting with dividers
-- `src/components/chat/SocialPostCard.tsx` — fade-in animation class
-- `src/components/chat/EmailCard.tsx` — fade-in animation class
-- `src/components/chat/ListingCard.tsx` — fade-in animation class
-
-No database or edge function changes needed.
+## Files modified: 2
+- `src/components/chat/SuggestionChips.tsx` (new)
+- `src/components/chat/ChatPanel.tsx`
 
