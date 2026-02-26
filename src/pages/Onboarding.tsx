@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ const Onboarding = () => {
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, loading } = useAuth();
 
   // Step 1
@@ -122,7 +124,12 @@ const Onboarding = () => {
         return;
       }
 
-      await new Promise((r) => setTimeout(r, 100));
+      queryClient.setQueryData(["profile-sub", user.id], (old: any) => ({
+        ...old,
+        onboarding_completed: true,
+        trial_ends_at: trialEnd.toISOString(),
+      }));
+
       navigate("/chat", { replace: true });
     } catch (err) {
       toast.error("An unexpected error occurred. Please try again.");
