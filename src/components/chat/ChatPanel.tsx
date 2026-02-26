@@ -30,11 +30,13 @@ const TypingIndicator = ({ status }: { status: string }) => (
 const WELCOME_TEMPLATE = (firstName: string) =>
   `Hey ${firstName}! I'm Caselli Cowork, your AI coworker. I've reviewed your business profile and I'm ready to help. Here are a few things I can do right now:\n\n- **Draft social media posts** for your listings\n- **Track your deals** and flag upcoming deadlines\n- **Write emails** in your voice to clients and vendors\n- **Manage your contacts** and follow-up reminders\n\nWhat would you like to tackle first?`;
 
-function parseConversationContext(toolsUsed: { tool: string; description: string }[]): ConversationContext {
+function parseConversationContext(toolsUsed: { tool: string; description: string; deal_id?: string; contact_id?: string }[]): ConversationContext {
   const toolNames = toolsUsed.map((t) => t.tool);
 
   let topic: ConversationContext["topic"] = "general";
   let lastToolUsed: string | undefined;
+  let lastDealId: string | undefined;
+  let lastContactId: string | undefined;
 
   if (toolNames.some((t) => DEAL_TOOLS.includes(t))) {
     topic = "deals";
@@ -44,11 +46,13 @@ function parseConversationContext(toolsUsed: { tool: string; description: string
     topic = "contacts";
   }
 
-  if (toolNames.length > 0) {
-    lastToolUsed = toolNames[toolNames.length - 1];
+  for (const t of toolsUsed) {
+    if (t.tool) lastToolUsed = t.tool;
+    if (t.deal_id) lastDealId = t.deal_id;
+    if (t.contact_id) lastContactId = t.contact_id;
   }
 
-  return { topic, lastToolUsed };
+  return { topic, lastToolUsed, lastDealId, lastContactId };
 }
 
 // Parse SSE events from a text buffer, returns [parsed events, remaining buffer]
