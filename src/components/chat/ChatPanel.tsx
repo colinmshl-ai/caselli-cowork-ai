@@ -540,7 +540,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
             >
               {m.role === "assistant" ? (
                 <>
-                  <ContentCardRenderer content={m.content} />
+                  <ContentCardRenderer content={m.content} onAction={sendMessage} />
                   <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <CopyButton text={m.content} />
                   </div>
