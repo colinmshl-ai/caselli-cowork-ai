@@ -455,7 +455,7 @@ Deno.serve(async (req) => {
     const [profileRes, memoryRes, historyRes] = await Promise.all([
       userClient.from("business_profiles").select("*").eq("user_id", userId).maybeSingle(),
       userClient.from("memory_facts").select("fact").eq("user_id", userId).order("created_at", { ascending: false }).limit(25),
-      userClient.from("messages").select("role, content").eq("conversation_id", conversation_id).order("created_at", { ascending: true }),
+      userClient.from("messages").select("role, content, metadata").eq("conversation_id", conversation_id).order("created_at", { ascending: true }),
     ]);
 
     const profile = profileRes.data;
@@ -525,10 +525,14 @@ MULTI-ACTION BEHAVIOR:
 - After completing a chain of actions, summarize everything you did in a clear list.`;
 
     const apiMessages = [
-      ...history.map((m: { role: string; content: string }) => ({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: m.content,
-      })),
+      ...history.map((m: { role: string; content: string; metadata?: { tools?: { tool: string; input: Record<string, unknown> }[] } }) => {
+        let content = m.content;
+        if (m.role === "assistant" && m.metadata?.tools) {
+          const toolSummary = m.metadata.tools.map((t: { tool: string }) => `[Used ${t.tool}]`).join(" ");
+          content = toolSummary + "\n" + content;
+        }
+        return { role: m.role === "assistant" ? "assistant" : "user", content };
+      }),
       { role: "user", content: message },
     ];
 
@@ -546,6 +550,7 @@ MULTI-ACTION BEHAVIOR:
         try {
           let fullText = "";
           const toolsUsed: { tool: string; description: string }[] = [];
+          const toolCallLog: { tool: string; input: Record<string, unknown>; result: unknown }[] = [];
           let currentMessages = [...apiMessages];
           let iterations = 0;
           let lastCreatedDealId: string | null = null;
@@ -629,6 +634,8 @@ MULTI-ACTION BEHAVIOR:
                   adminClient
                 );
 
+                toolCallLog.push({ tool: tool.name, input: tool.input, result });
+
                 // Track entity IDs from tool results
                 if (result && typeof result === "object" && !Array.isArray(result)) {
                   const r = result as Record<string, unknown>;
@@ -668,11 +675,13 @@ MULTI-ACTION BEHAVIOR:
 
           // Save assistant message
           const assistantContent = fullText || "I wasn't able to generate a response.";
+          const metadata = toolCallLog.length > 0 ? { tools: toolCallLog.map(t => ({ tool: t.tool, input: t.input })) } : null;
           await Promise.all([
             userClient.from("messages").insert({
               conversation_id,
               role: "assistant",
               content: assistantContent,
+              metadata,
             }),
             userClient.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation_id),
           ]);
