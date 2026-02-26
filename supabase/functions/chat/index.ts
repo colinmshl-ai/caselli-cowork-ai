@@ -598,8 +598,7 @@ RULES:
       }
     })();
 
-    // Await memory extraction before returning to ensure it completes
-    await memoryExtractionPromise;
+    // Memory extraction runs in background — no await needed
 
     return new Response(JSON.stringify({ response: assistantContent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
