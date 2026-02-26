@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import DealSlideOver from "@/components/deals/DealSlideOver";
 import DealBoardView from "@/components/deals/DealBoardView";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LayoutList, Columns3 } from "lucide-react";
+import { LayoutList, Columns3, Inbox } from "lucide-react";
 
 const STAGES = [
   { value: "all", label: "All" },
@@ -152,10 +152,13 @@ const Deals = () => {
         <div className="px-5 py-5 space-y-1">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 py-3.5 border-b border-border">
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/5" />
-                <Skeleton className="h-3 w-2/5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-4 w-2/5" />
+                  <Skeleton className="h-3 w-1/4" />
+                </div>
               </div>
+              <Skeleton className="h-5 w-20 rounded-full" />
               <Skeleton className="h-3 w-16" />
             </div>
           ))}
@@ -163,9 +166,10 @@ const Deals = () => {
       ) : viewMode === "board" ? (
         <DealBoardView deals={deals} onEditDeal={openEdit} />
       ) : deals.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20">
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Inbox size={48} className="text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">No deals yet</p>
-          <button onClick={openNew} className="mt-2 text-sm font-medium text-primary hover:opacity-70 transition-opacity">
+          <button onClick={openNew} className="text-sm font-medium text-primary hover:opacity-70 transition-opacity">
             Add your first deal
           </button>
         </div>

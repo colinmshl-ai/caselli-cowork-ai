@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, MutableRefObject } from "reac
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, ArrowUp, Clock, Search } from "lucide-react";
+import { Plus, ArrowUp, Clock, Search, Home, Camera, BarChart3, Users } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
@@ -601,20 +601,27 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 md:space-y-8" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
         {messages.length === 0 && !typingStatus && (
           <div className="flex flex-col items-center justify-center h-full gap-6">
-            <p className="text-sm text-muted-foreground">Start a conversation with Caselli Cowork</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-md w-full">
+            <div className="text-center">
+              <h2 className="text-xl">
+                <span className="font-serif italic font-medium text-foreground">Caselli</span>{" "}
+                <span className="font-sans font-light text-muted-foreground">Cowork</span>
+              </h2>
+              <p className="text-sm text-muted-foreground mt-2">What can I help you with today?</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-md w-full">
               {[
-                "I just got a new listing at...",
-                "Draft a social post for...",
-                "Give me a pipeline overview",
-                "Help me follow up with a client",
-              ].map((prompt) => (
+                { prompt: "I just got a new listing at...", icon: Home },
+                { prompt: "Draft a social post for...", icon: Camera },
+                { prompt: "Give me a pipeline overview", icon: BarChart3 },
+                { prompt: "Help me follow up with a client", icon: Users },
+              ].map(({ prompt, icon: Icon }) => (
                 <button
                   key={prompt}
                   onClick={() => sendMessage(prompt)}
-                  className="text-left text-sm px-4 py-3 rounded-lg border border-border bg-card hover:bg-secondary/50 text-foreground transition-colors"
+                  className="flex items-center gap-3 text-left text-sm px-4 py-3.5 rounded-xl border border-border bg-card text-foreground hover:border-primary/30 transition-all"
                 >
-                  {prompt}
+                  <Icon size={16} className="text-muted-foreground shrink-0" />
+                  <span>{prompt}</span>
                 </button>
               ))}
             </div>
@@ -643,19 +650,20 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         {/* Starter prompts below welcome message when no user messages yet */}
         {messages.length > 0 && messages.every((m) => m.role === "assistant") && !typingStatus && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-md">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-md">
             {[
-              "I just got a new listing at...",
-              "Draft a social post for...",
-              "Give me a pipeline overview",
-              "Help me follow up with a client",
-            ].map((prompt) => (
+              { prompt: "I just got a new listing at...", icon: Home },
+              { prompt: "Draft a social post for...", icon: Camera },
+              { prompt: "Give me a pipeline overview", icon: BarChart3 },
+              { prompt: "Help me follow up with a client", icon: Users },
+            ].map(({ prompt, icon: Icon }) => (
               <button
                 key={prompt}
                 onClick={() => sendMessage(prompt)}
-                className="text-left text-sm px-4 py-3 rounded-lg border border-border bg-card hover:bg-secondary/50 text-foreground transition-colors"
+                className="flex items-center gap-3 text-left text-sm px-4 py-3.5 rounded-xl border border-border bg-card text-foreground hover:border-primary/30 transition-all"
               >
-                {prompt}
+                <Icon size={16} className="text-muted-foreground shrink-0" />
+                <span>{prompt}</span>
               </button>
             ))}
           </div>
