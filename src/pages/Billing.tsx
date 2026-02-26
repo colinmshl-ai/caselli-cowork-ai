@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const PLANS = [
   {
@@ -68,8 +69,29 @@ const Billing = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto max-w-4xl px-5 py-12">
+          <div className="text-center mb-12">
+            <Skeleton className="h-5 w-16 mx-auto mb-6" />
+            <Skeleton className="h-6 w-48 mx-auto mb-2" />
+            <Skeleton className="h-4 w-64 mx-auto" />
+          </div>
+          <div className="grid gap-12 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="space-y-4">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-3 w-32" />
+                <div className="space-y-2 pt-4">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-4/5" />
+                  <Skeleton className="h-3 w-3/5" />
+                </div>
+                <Skeleton className="h-10 w-full mt-4" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -101,11 +123,11 @@ const Billing = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-4xl px-6 py-16">
+      <div className="mx-auto max-w-4xl px-5 py-12">
         {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground mb-2">Caselli</h1>
-          <h2 className="text-3xl font-semibold text-foreground mt-8 mb-3">Choose your plan</h2>
+        <div className="text-center mb-12">
+          <h1 className="text-base font-semibold tracking-tight text-foreground mb-2">Caselli</h1>
+          <h2 className="text-xl font-semibold text-foreground mt-6 mb-3">Choose your plan</h2>
           <p className="text-muted-foreground">14-day free trial included with every plan</p>
           <div className="mt-4 flex items-center justify-center gap-4">
             {profile?.onboarding_completed && (

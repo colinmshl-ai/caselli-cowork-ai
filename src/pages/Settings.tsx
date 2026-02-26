@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const SPECIALTIES_OPTIONS = [
   "Residential",
@@ -124,8 +125,23 @@ const Settings = () => {
 
   if (dataLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-5 py-4">
+          <Skeleton className="h-5 w-16" />
+        </div>
+        <div className="px-5 py-8 max-w-2xl space-y-12">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-4">
+              <Skeleton className="h-5 w-28" />
+              <div className="space-y-3">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-9 w-full" />
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -319,7 +335,7 @@ const Settings = () => {
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="mb-12">
-    <h2 className="text-lg font-semibold text-foreground mb-5">{title}</h2>
+    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">{title}</h2>
     <div className="space-y-4">{children}</div>
   </div>
 );
