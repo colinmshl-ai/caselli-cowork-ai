@@ -13,6 +13,7 @@ interface SocialPostCardProps {
   platform: string;
   content: string;
   onAction?: (message: string) => void;
+  contentType?: "drafted" | "informational";
 }
 
 const PLATFORM_ICONS: Record<string, React.ElementType> = {
@@ -33,7 +34,7 @@ const CHAR_LIMITS: Record<string, { limit: number; label: string }> = {
 
 const ALL_PLATFORMS = ["Instagram", "Facebook", "Twitter/X", "LinkedIn", "TikTok"];
 
-const SocialPostCard = ({ platform, content, onAction }: SocialPostCardProps) => {
+const SocialPostCard = ({ platform, content, onAction, contentType }: SocialPostCardProps) => {
   const platformKey = platform.toLowerCase().replace("/x", "").replace("twitter", "x") === "x" ? "x" : platform.toLowerCase();
   const Icon = PLATFORM_ICONS[platformKey] || MessageCircle;
   const charInfo = CHAR_LIMITS[platformKey];
@@ -72,57 +73,59 @@ const SocialPostCard = ({ platform, content, onAction }: SocialPostCardProps) =>
         <p className="text-sm text-foreground whitespace-pre-wrap">{content}</p>
       </div>
 
-      {/* Footer: stats left, actions right */}
-      <div className="px-4 py-2 flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">
-          {charCount} chars · {wordCount} words
-          {charInfo && (
-            <span className={`ml-2 ${limitColor}`}>
-              · {limitWarning || charInfo.label}
-            </span>
-          )}
-        </span>
-        <div className="flex items-center gap-1">
-          {onAction && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                onClick={() => onAction("Edit this post: make changes as needed")}
-              >
-                <Pencil size={11} className="mr-1" />
-                Edit
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                  >
-                    <Share2 size={11} className="mr-1" />
-                    Adapt
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  {otherPlatforms.map((p) => (
-                    <DropdownMenuItem
-                      key={p}
-                      onClick={() => onAction?.(`Adapt this post for ${p}`)}
-                      className="text-xs"
+      {/* Footer: stats left, actions right — only for drafted content */}
+      {contentType === "drafted" && (
+        <div className="px-4 py-2 flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">
+            {charCount} chars · {wordCount} words
+            {charInfo && (
+              <span className={`ml-2 ${limitColor}`}>
+                · {limitWarning || charInfo.label}
+              </span>
+            )}
+          </span>
+          <div className="flex items-center gap-1">
+            {onAction && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={() => onAction("Edit this post: make changes as needed")}
+                >
+                  <Pencil size={11} className="mr-1" />
+                  Edit
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
                     >
-                      {p}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <CardActions contentType="post" onAction={onAction} />
-            </>
-          )}
-          <CopyButton text={content} />
+                      <Share2 size={11} className="mr-1" />
+                      Adapt
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    {otherPlatforms.map((p) => (
+                      <DropdownMenuItem
+                        key={p}
+                        onClick={() => onAction?.(`Adapt this post for ${p}`)}
+                        className="text-xs"
+                      >
+                        {p}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <CardActions contentType="post" onAction={onAction} />
+              </>
+            )}
+            <CopyButton text={content} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

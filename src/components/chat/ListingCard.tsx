@@ -6,9 +6,10 @@ interface ListingCardProps {
   stats: string;
   description: string;
   onAction?: (message: string) => void;
+  contentType?: "drafted" | "informational";
 }
 
-const ListingCard = ({ address, stats, description, onAction }: ListingCardProps) => {
+const ListingCard = ({ address, stats, description, onAction, contentType }: ListingCardProps) => {
   const wordCount = description.trim().split(/\s+/).filter(Boolean).length;
   const charCount = description.length;
 
@@ -23,15 +24,17 @@ const ListingCard = ({ address, stats, description, onAction }: ListingCardProps
       <div className="px-4 py-3">
         <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{description}</p>
       </div>
-      <div className="px-4 py-2 flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">
-          {charCount} chars · {wordCount} words
-        </span>
-        <div className="flex items-center gap-1">
-          {onAction && <CardActions contentType="listing" onAction={onAction} />}
-          <CopyButton text={description} />
+      {contentType === "drafted" && (
+        <div className="px-4 py-2 flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">
+            {charCount} chars · {wordCount} words
+          </span>
+          <div className="flex items-center gap-1">
+            {onAction && <CardActions contentType="listing" onAction={onAction} />}
+            <CopyButton text={description} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

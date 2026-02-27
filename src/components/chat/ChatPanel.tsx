@@ -408,7 +408,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           lastContactId: lastContactIdFromDone,
         };
         setMessages((prev) =>
-          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, ...entityIds } : m))
+          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, toolsUsed, ...entityIds } : m))
         );
 
         // Fetch the saved message from DB to get the real ID
@@ -422,7 +422,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         if (latestMessages?.[0]) {
           setMessages((prev) =>
-            prev.map((m) => (m.id === placeholderId ? latestMessages[0] : m))
+            prev.map((m) => (m.id === placeholderId ? { ...latestMessages[0], toolsUsed } : m))
           );
         }
 
@@ -641,7 +641,15 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
               {m.role === "assistant" ? (
                 <>
                   <EntityLinker dealId={m.lastDealId} contactId={m.lastContactId}>
-                    <ContentCardRenderer content={m.content} onAction={sendMessage} />
+                    <ContentCardRenderer
+                      content={m.content}
+                      onAction={sendMessage}
+                      contentType={
+                        m.toolsUsed?.some((t: any) => CONTENT_TOOLS.includes(t.tool))
+                          ? "drafted"
+                          : "informational"
+                      }
+                    />
                   </EntityLinker>
                   {m.isError && lastUserMessage && (
                     <button

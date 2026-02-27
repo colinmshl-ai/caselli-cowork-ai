@@ -9,9 +9,10 @@ interface EmailCardProps {
   subject: string;
   body: string;
   onAction?: (message: string) => void;
+  contentType?: "drafted" | "informational";
 }
 
-const EmailCard = ({ to, subject, body, onAction }: EmailCardProps) => {
+const EmailCard = ({ to, subject, body, onAction, contentType }: EmailCardProps) => {
   const wordCount = body.trim().split(/\s+/).filter(Boolean).length;
   const charCount = body.length;
 
@@ -26,33 +27,35 @@ const EmailCard = ({ to, subject, body, onAction }: EmailCardProps) => {
       <div className="px-4 py-3">
         <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{body}</p>
       </div>
-      <div className="px-4 py-2 flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">
-          {charCount} chars · {wordCount} words
-        </span>
-        <div className="flex items-center gap-1">
-          {onAction && <CardActions contentType="email" onAction={onAction} />}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-            onClick={() => toast.info("Coming soon — connect Gmail in Settings")}
-          >
-            <Send size={11} className="mr-1" />
-            Send
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-            onClick={() => toast.success("Draft saved")}
-          >
-            <Save size={11} className="mr-1" />
-            Save draft
-          </Button>
-          <CopyButton text={`To: ${to}\nSubject: ${subject}\n\n${body}`} />
+      {contentType === "drafted" && (
+        <div className="px-4 py-2 flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">
+            {charCount} chars · {wordCount} words
+          </span>
+          <div className="flex items-center gap-1">
+            {onAction && <CardActions contentType="email" onAction={onAction} />}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+              onClick={() => toast.info("Coming soon — connect Gmail in Settings")}
+            >
+              <Send size={11} className="mr-1" />
+              Send
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+              onClick={() => toast.success("Draft saved")}
+            >
+              <Save size={11} className="mr-1" />
+              Save draft
+            </Button>
+            <CopyButton text={`To: ${to}\nSubject: ${subject}\n\n${body}`} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
