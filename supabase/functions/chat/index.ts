@@ -808,10 +808,25 @@ MULTI-ACTION BEHAVIOR:
             }
           }
 
+          // Derive content_type from tools used
+          const DRAFT_CONTENT_TYPE_MAP: Record<string, string> = {
+            draft_social_post: "social_post",
+            draft_email: "email",
+            draft_listing_description: "listing_description",
+          };
+          let contentType = "conversational";
+          for (const t of toolCallLog) {
+            if (DRAFT_CONTENT_TYPE_MAP[t.tool]) {
+              contentType = DRAFT_CONTENT_TYPE_MAP[t.tool];
+              break;
+            }
+          }
+
           // Save assistant message with enriched tool metadata
           const assistantContent = fullText || "I wasn't able to generate a response.";
-          const metadata = toolCallLog.length > 0 ? {
-            tools: toolCallLog.map(t => {
+          const metadata: Record<string, unknown> = { content_type: contentType };
+          if (toolCallLog.length > 0) {
+            metadata.tools = toolCallLog.map(t => {
               // Create a concise result summary for history context
               let resultSummary = "";
               if (t.result && typeof t.result === "object" && !Array.isArray(t.result)) {
@@ -825,8 +840,8 @@ MULTI-ACTION BEHAVIOR:
                 resultSummary = `${t.result.length} result(s)`;
               }
               return { tool: t.tool, input: t.input, result_summary: resultSummary || undefined };
-            })
-          } : null;
+            });
+          }
           await Promise.all([
             userClient.from("messages").insert({
               conversation_id,
@@ -901,7 +916,7 @@ MULTI-ACTION BEHAVIOR:
           }
 
           // Send done event
-          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext });
+          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext, content_type: contentType });
 
 
           // Background memory extraction (fire and forget)
