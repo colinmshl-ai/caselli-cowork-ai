@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow, format } from "date-fns";
-import { Home, FileText, UserPlus, RefreshCw, Clock, Activity, Search, Mail, ChevronRight } from "lucide-react";
+import { Home, FileText, UserPlus, RefreshCw, Clock, Activity, Search, Mail, ChevronRight, Circle, CheckCircle2, Loader2 } from "lucide-react";
 import type { ConversationContext } from "@/pages/Chat";
+import type { TodoItem } from "./ChatPanel";
 
 const DEFAULT_ACTIONS = [
   { label: "Draft social posts", message: "Help me draft social media posts for my current listings." },
@@ -55,9 +56,40 @@ interface ActivityPanelProps {
   onQuickAction: (message: string) => void;
   conversationContext: ConversationContext;
   isFloating?: boolean;
+  todos?: TodoItem[];
 }
 
-const ActivityPanel = ({ onQuickAction, conversationContext, isFloating }: ActivityPanelProps) => {
+const TodoWidget = ({ todos }: { todos: TodoItem[] }) => {
+  if (todos.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-border bg-card p-3.5 space-y-1">
+      <h4 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Tasks</h4>
+      {todos.map((todo) => (
+        <div
+          key={todo.index}
+          className={`flex items-start gap-2.5 py-1.5 transition-all duration-300 ${
+            todo.status === "completed" ? "opacity-50" : ""
+          }`}
+        >
+          {todo.status === "completed" ? (
+            <CheckCircle2 size={14} className="text-primary shrink-0 mt-0.5" />
+          ) : todo.status === "in_progress" ? (
+            <Loader2 size={14} className="text-primary shrink-0 mt-0.5 animate-spin" />
+          ) : (
+            <Circle size={14} className="text-muted-foreground/40 shrink-0 mt-0.5" />
+          )}
+          <span className={`text-sm leading-snug ${
+            todo.status === "in_progress" ? "text-foreground font-medium" : "text-muted-foreground"
+          }`}>
+            {todo.status === "in_progress" ? todo.active_form : todo.content}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const ActivityPanel = ({ onQuickAction, conversationContext, isFloating, todos = [] }: ActivityPanelProps) => {
   const { user } = useAuth();
   const now = new Date();
   const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -229,6 +261,9 @@ const ActivityPanel = ({ onQuickAction, conversationContext, isFloating }: Activ
           {format(now, "EEEE, MMMM d")}
         </p>
       </div>
+
+      {/* Todo widget - shown at top when active */}
+      {todos.length > 0 && <TodoWidget todos={todos} />}
 
       <div key={topic} className="transition-opacity duration-200 animate-in fade-in space-y-4">
         {topic === "general" && (

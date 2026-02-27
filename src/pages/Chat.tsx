@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Activity, X } from "lucide-react";
 import ChatPanel from "@/components/chat/ChatPanel";
+import type { TodoItem } from "@/components/chat/ChatPanel";
 import ActivityPanel from "@/components/chat/ActivityPanel";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -22,6 +23,7 @@ const Chat = () => {
   const [conversationContext, setConversationContext] = useState<ConversationContext>({ topic: "general" });
   const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [showActivity, setShowActivity] = useState(false);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
 
   useEffect(() => {
     const prompt = searchParams.get("prompt");
@@ -50,7 +52,6 @@ const Chat = () => {
 
   return (
     <div className="relative flex h-full flex-col">
-      {/* Full-width chat panel */}
       <ChatPanel
         pendingPrompt={pendingPrompt}
         onPromptConsumed={() => setPendingPrompt(null)}
@@ -59,12 +60,11 @@ const Chat = () => {
         textareaRef={chatTextareaRef}
         onToggleActivity={() => setShowActivity((p) => !p)}
         showActivity={showActivity}
+        onTodosUpdate={setTodos}
       />
 
-      {/* Floating activity overlay */}
       {showActivity && (
         <>
-          {/* Backdrop on mobile */}
           {isMobile && (
             <div
               className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
@@ -83,7 +83,6 @@ const Chat = () => {
               animate-in fade-in slide-in-from-right-3 duration-200
             `}
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Activity size={14} className="text-muted-foreground" />
@@ -97,12 +96,12 @@ const Chat = () => {
               </button>
             </div>
 
-            {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto">
               <ActivityPanel
                 onQuickAction={handleQuickAction}
                 conversationContext={conversationContext}
                 isFloating
+                todos={todos}
               />
             </div>
           </div>
