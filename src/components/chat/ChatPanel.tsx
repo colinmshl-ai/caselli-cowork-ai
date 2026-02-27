@@ -11,6 +11,8 @@ import StreamingText from "./StreamingText";
 import UndoButton from "./UndoButton";
 import ToolProgressCard from "./ToolProgressCard";
 import FileCard from "./FileCard";
+import SourcesCard from "./SourcesCard";
+import type { Source } from "./SourcesCard";
 import type { ToolCard } from "./ToolProgressCard";
 
 import EntityLinker from "./EntityLinker";
@@ -353,6 +355,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         let lastContactIdFromDone: string | undefined;
         let contentTypeFromDone: string | undefined;
         let undoActionsFromDone: any[] | undefined;
+        let sourcesFromDone: Source[] | undefined;
         let errorSeen = false;
         const toolCardMap: Record<string, string> = {};
         setToolCards([]);
@@ -446,6 +449,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 // Capture content_type from done event
                 contentTypeFromDone = parsed.content_type || undefined;
                 undoActionsFromDone = parsed.undo_actions || undefined;
+                sourcesFromDone = parsed.sources || undefined;
                 // Capture chip context
                 if (parsed.chip_context) {
                   setChipContext(parsed.chip_context as ChipContext);
@@ -485,7 +489,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           lastContactId: lastContactIdFromDone,
         };
         setMessages((prev) =>
-          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, isStreaming: false, toolsUsed, contentTypeHint: contentTypeFromDone, undoActions: undoActionsFromDone, ...entityIds } : m))
+          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, isStreaming: false, toolsUsed, contentTypeHint: contentTypeFromDone, undoActions: undoActionsFromDone, sources: sourcesFromDone, ...entityIds } : m))
         );
 
         // Fetch the saved message from DB to get the real ID
@@ -499,7 +503,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         if (latestMessages?.[0]) {
           setMessages((prev) =>
-            prev.map((m) => (m.id === placeholderId ? { ...latestMessages[0], toolsUsed, contentTypeHint: contentTypeFromDone, undoActions: undoActionsFromDone } : m))
+            prev.map((m) => (m.id === placeholderId ? { ...latestMessages[0], toolsUsed, contentTypeHint: contentTypeFromDone, undoActions: undoActionsFromDone, sources: sourcesFromDone } : m))
           );
         }
 
@@ -759,6 +763,9 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                         />
                       </EntityLinker>
                     </div>
+                  )}
+                  {m.sources && m.sources.length > 0 && (
+                    <SourcesCard sources={m.sources} />
                   )}
                   {(m.undoActions || (m.metadata as any)?.undo_actions)?.length > 0 && (
                     <UndoButton

@@ -619,13 +619,22 @@ async function parseAnthropicStream(
             currentToolName = event.content_block.name;
             currentToolInput = "";
           } else if (event.content_block?.type === "web_search_tool_result") {
-            // Server-side web search completed — stream results to frontend
+            // Server-side web search completed — collect sources and stream to frontend
             const searchResults = event.content_block.search_results || [];
-            const sources = searchResults.map((r: { title?: string; url?: string }) => r.title || r.url || "").filter(Boolean).slice(0, 5);
+            const collectedSources = searchResults.map((r: { title?: string; url?: string }) => {
+              const url = r.url || "";
+              let domain = "";
+              try { domain = new URL(url).hostname.replace("www.", ""); } catch { /* ignore */ }
+              return { title: r.title || url, url, domain };
+            }).filter((s: { url: string }) => s.url);
+            // Store sources on the function-level for the done event
+            if (typeof (controller as any).__sources === "undefined") (controller as any).__sources = [];
+            (controller as any).__sources.push(...collectedSources);
+            const sourceNames = collectedSources.map((s: { title: string }) => s.title).slice(0, 5);
             sendSSE(controller, "web_search_result", {
               query: event.content_block.content?.query || "",
               results_count: searchResults.length,
-              sources,
+              sources: sourceNames,
             });
           }
           break;
@@ -1244,8 +1253,13 @@ FILE CREATION:
             }
           }
 
+          // Collect web search sources
+          const webSources = ((controller as any).__sources || []) as { title: string; url: string; domain: string }[];
+          // Deduplicate by URL
+          const uniqueSources = [...new Map(webSources.map((s: { title: string; url: string; domain: string }) => [s.url, s])).values()];
+
           // Send done event
-          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext, content_type: contentType, undo_actions: undoActions.length > 0 ? undoActions : undefined });
+          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext, content_type: contentType, undo_actions: undoActions.length > 0 ? undoActions : undefined, sources: uniqueSources.length > 0 ? uniqueSources : undefined });
 
 
           // Background memory extraction (fire and forget)
