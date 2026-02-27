@@ -284,13 +284,20 @@ function parseDealSummary(content: string) {
   return { intro: introLines.join("\n").trim(), deals, deadlines };
 }
 
-/** Split content into sections on "---" horizontal rules */
+/** Split content into sections on "---" horizontal rules, but avoid over-splitting */
 function splitSections(content: string): string[] {
-  const parts = content.split(/\n---+\n/);
+  const parts = content.split(/\n-{3,}\n/);
   const result: string[] = [];
   for (const part of parts) {
     const trimmed = part.trim();
-    if (trimmed) result.push(trimmed);
+    if (!trimmed) continue;
+    // If this part is very short (under 50 chars) and the previous result exists,
+    // append it to the previous section instead of creating a new one
+    if (trimmed.length < 50 && result.length > 0) {
+      result[result.length - 1] += '\n\n' + trimmed;
+    } else {
+      result.push(trimmed);
+    }
   }
   return result.length > 0 ? result : [content];
 }
