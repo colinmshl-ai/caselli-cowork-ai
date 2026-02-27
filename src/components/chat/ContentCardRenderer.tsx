@@ -26,7 +26,10 @@ function detectSocial(content: string) {
 }
 
 function detectListing(content: string) {
-  return /\bbed/i.test(content) && /\bbath/i.test(content) && /\d/.test(content);
+  const hasBedBath = /\bbed/i.test(content) && /\bbath/i.test(content) && /\d/.test(content);
+  const hasMLS = /\bMLS\b|listing description|property description/i.test(content);
+  const hasPropertyDetails = /sq\s*ft|square feet|square foot/i.test(content) && /\d/.test(content);
+  return hasBedBath || hasMLS || hasPropertyDetails;
 }
 
 function parseEmail(content: string) {
@@ -113,7 +116,14 @@ function parseListing(content: string) {
   }
 
   if (!address) {
-    address = "Property";
+    // Try "at [address]" pattern
+    const atMatch = content.match(/\bat\s+(\d+\s+[A-Z][\w\s,]+)/i);
+    if (atMatch) {
+      address = atMatch[1].replace(/[*#]+/g, "").trim();
+    } else {
+      address = "Listing Description";
+    }
+
     const bedBathLine = lines.find((l) => /\bbed/i.test(l) && /\bbath/i.test(l));
     if (bedBathLine) {
       statsLine = bedBathLine.replace(/[*#-]+/g, "").trim();
