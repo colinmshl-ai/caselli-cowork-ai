@@ -10,6 +10,7 @@ import ContentCardRenderer from "./ContentCardRenderer";
 
 import EntityLinker from "./EntityLinker";
 import SuggestionChips from "./SuggestionChips";
+import type { ChipContext } from "./SuggestionChips";
 import type { ConversationContext } from "@/pages/Chat";
 
 const DEAL_TOOLS = ["get_active_deals", "get_deal_details", "update_deal", "check_upcoming_deadlines", "create_deal"];
@@ -112,6 +113,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const [lastToolUsed, setLastToolUsed] = useState<string | undefined>();
   const [lastTopic, setLastTopic] = useState<string | undefined>();
   const [lastUserMessage, setLastUserMessage] = useState<string>("");
+  const [chipContext, setChipContext] = useState<ChipContext>({});
 
   // Mobile keyboard handling via visualViewport
   useEffect(() => {
@@ -373,6 +375,10 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 // Capture entity IDs from done event
                 lastDealIdFromDone = parsed.last_deal_id || undefined;
                 lastContactIdFromDone = parsed.last_contact_id || undefined;
+                // Capture chip context
+                if (parsed.chip_context) {
+                  setChipContext(parsed.chip_context as ChipContext);
+                }
                 if (lastDealIdFromDone || lastContactIdFromDone) {
                   const ctx = parseConversationContext(toolsUsed);
                   ctx.lastDealId = lastDealIdFromDone;
@@ -701,6 +707,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         <SuggestionChips
           lastToolUsed={lastToolUsed}
           topic={lastTopic}
+          contextData={chipContext}
           onSend={sendMessage}
         />
       )}

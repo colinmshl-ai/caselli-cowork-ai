@@ -849,8 +849,37 @@ MULTI-ACTION BEHAVIOR:
             }
           }
 
+          // Build chip context from tool results
+          const chipContext: Record<string, unknown> = {};
+          for (const t of toolCallLog) {
+            if (t.tool === "get_active_deals" && Array.isArray(t.result)) {
+              chipContext.activeDealsCount = t.result.length;
+              const now = new Date();
+              const weekOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+              const nowStr = now.toISOString().split("T")[0];
+              const weekStr = weekOut.toISOString().split("T")[0];
+              let deadlineCount = 0;
+              for (const d of t.result as Record<string, unknown>[]) {
+                for (const f of ["closing_date", "inspection_deadline", "financing_deadline", "appraisal_deadline"]) {
+                  const v = d[f] as string | undefined;
+                  if (v && v >= nowStr && v <= weekStr) deadlineCount++;
+                }
+              }
+              chipContext.upcomingDeadlines = deadlineCount;
+            }
+            if (t.tool === "update_deal" && t.input?.stage) {
+              chipContext.lastDealStage = t.input.stage;
+            }
+            if (t.tool === "create_deal" && t.input?.stage) {
+              chipContext.lastDealStage = t.input.stage;
+            }
+            if (t.tool === "add_contact" && t.input?.contact_type) {
+              chipContext.lastContactType = t.input.contact_type;
+            }
+          }
+
           // Send done event
-          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId });
+          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext });
 
 
           // Background memory extraction (fire and forget)
