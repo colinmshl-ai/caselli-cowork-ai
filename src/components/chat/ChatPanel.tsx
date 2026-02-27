@@ -25,25 +25,32 @@ interface ChatPanelProps {
   textareaRef?: MutableRefObject<HTMLTextAreaElement | null>;
 }
 
-const TypingIndicator = ({ status, completedTools }: { status: string; completedTools: string[] }) => (
-  <div className="flex flex-wrap gap-1.5 py-2">
-    {completedTools.map((tool, i) => (
-      <span
-        key={i}
-        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-accent/10 text-accent-foreground animate-fade-in"
-      >
-        <span className="text-primary">✓</span>
-        {tool}
-      </span>
-    ))}
-    {status && (
-      <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-primary/10 text-primary">
-        <span className="flex gap-0.5">
-          <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "0ms" }} />
-          <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "200ms" }} />
-          <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "400ms" }} />
+const TypingIndicator = ({ status, completedTools, isSlowResponse }: { status: string; completedTools: string[]; isSlowResponse?: boolean }) => (
+  <div className="flex flex-col gap-1.5 py-2">
+    <div className="flex flex-wrap gap-1.5">
+      {completedTools.map((tool, i) => (
+        <span
+          key={i}
+          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-accent/10 text-accent-foreground animate-fade-in"
+        >
+          <span className="text-primary">✓</span>
+          {tool}
         </span>
-        {status}
+      ))}
+      {status && (
+        <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-primary/10 text-primary">
+          <span className="flex gap-0.5">
+            <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "200ms" }} />
+            <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "400ms" }} />
+          </span>
+          {status}
+        </span>
+      )}
+    </div>
+    {isSlowResponse && (
+      <span className="text-[11px] text-muted-foreground animate-fade-in">
+        This is taking longer than usual…
       </span>
     )}
   </div>
@@ -109,6 +116,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const initialized = useRef(false);
   const welcomeSent = useRef(false);
   const [completedTools, setCompletedTools] = useState<string[]>([]);
+  const [isSlowResponse, setIsSlowResponse] = useState(false);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [lastToolUsed, setLastToolUsed] = useState<string | undefined>();
   const [lastTopic, setLastTopic] = useState<string | undefined>();
@@ -293,6 +302,9 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
     setInput("");
     resetTextarea();
     setTypingStatus("Thinking...");
+    setIsSlowResponse(false);
+    if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    slowTimerRef.current = setTimeout(() => setIsSlowResponse(true), 30000);
     setLastToolUsed(undefined);
     setLastTopic(undefined);
     try {
@@ -480,6 +492,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
     } finally {
       setTypingStatus("");
       setCompletedTools([]);
+      setIsSlowResponse(false);
+      if (slowTimerRef.current) { clearTimeout(slowTimerRef.current); slowTimerRef.current = null; }
     }
   }, [activeConvoId, user, queryClient, onConversationContext]);
 
@@ -700,7 +714,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         )}
 
         {(typingStatus || completedTools.length > 0) && (
-          <TypingIndicator status={typingStatus} completedTools={completedTools} />
+          <TypingIndicator status={typingStatus} completedTools={completedTools} isSlowResponse={isSlowResponse} />
         )}
 
         <div ref={messagesEndRef} />
