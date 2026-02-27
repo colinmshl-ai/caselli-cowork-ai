@@ -10,6 +10,7 @@ import ContentCardRenderer from "./ContentCardRenderer";
 import StreamingText from "./StreamingText";
 import UndoButton from "./UndoButton";
 import ToolProgressCard from "./ToolProgressCard";
+import FileCard from "./FileCard";
 import type { ToolCard } from "./ToolProgressCard";
 
 import EntityLinker from "./EntityLinker";
@@ -423,6 +424,19 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 }
                 break;
               }
+              case "file_created": {
+                const parsed = JSON.parse(evt.data);
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: crypto.randomUUID(),
+                    role: "file" as any,
+                    content: "",
+                    fileData: parsed,
+                  },
+                ]);
+                break;
+              }
               case "done": {
                 const parsed = JSON.parse(evt.data);
                 toolsUsed = parsed.tools_used || [];
@@ -714,6 +728,11 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         {messages.map((m, idx) => (
           <div key={m.id} className={`flex animate-fade-in-up ${m.role === "user" ? "justify-end" : "justify-start"} ${m.role === "assistant" && idx > 0 && messages[idx - 1]?.role === "user" ? "mt-2" : ""}`}>
+            {(m as any).role === "file" && (m as any).fileData ? (
+              <div className="max-w-[85%] md:max-w-[95%]">
+                <FileCard {...(m as any).fileData} />
+              </div>
+            ) : (
             <div
               className={`text-sm leading-relaxed ${
                 m.role === "user"
@@ -764,6 +783,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 <p className="whitespace-pre-wrap">{m.content}</p>
               )}
             </div>
+            )}
           </div>
         ))}
 

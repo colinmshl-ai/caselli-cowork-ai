@@ -6,6 +6,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function getMimeType(format: string): string {
+  switch (format) {
+    case "md": return "text/markdown";
+    case "html": return "text/html";
+    case "csv": return "text/csv";
+    case "txt": return "text/plain";
+    default: return "text/plain";
+  }
+}
+
 function summarizeToolInput(toolName: string, input: Record<string, unknown>): string {
   switch (toolName) {
     case "search_contacts": return `Searching for "${input.query || input.name || "contacts"}"`;
@@ -19,6 +29,7 @@ function summarizeToolInput(toolName: string, input: Record<string, unknown>): s
     case "draft_email": return `Drafting ${input.email_type || "email"}${input.recipient_name ? ` to ${input.recipient_name}` : ""}`;
     case "draft_social_post": return `Drafting ${input.post_type || "post"} for ${input.platform || "social"}`;
     case "draft_listing_description": return `Writing listing description`;
+    case "create_file": return `Creating ${input.filename || "file"}`;
     default: return "Working...";
   }
 }
@@ -211,6 +222,19 @@ const TOOLS = [
         status: { type: "string", enum: ["in_progress", "completed"] },
       },
       required: ["index", "status"],
+    },
+  },
+  {
+    name: "create_file",
+    description: "Create a downloadable file for the user. Use this when the user asks you to write a document, report, spreadsheet export, or any deliverable they'd want to download. Supports markdown, HTML, CSV, and plain text formats.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filename: { type: "string", description: "Filename with extension, e.g. 'market-report.md'" },
+        content: { type: "string", description: "The full content of the file" },
+        format: { type: "string", enum: ["md", "html", "csv", "txt"], description: "File format" },
+      },
+      required: ["filename", "content", "format"],
     },
   },
 ];
@@ -494,6 +518,33 @@ async function executeTool(
         taskDescription: error ? `Failed to update ${contactName}` : `Updated ${contactName}'s ${updatedFields}`,
       };
     }
+    case "create_file": {
+      const filename = toolInput.filename as string;
+      const content = toolInput.content as string;
+      const format = toolInput.format as string;
+      const storagePath = `${userId}/${filename}`;
+
+      const { error: uploadError } = await adminClient.storage
+        .from("user-files")
+        .upload(storagePath, new Blob([content], { type: getMimeType(format) }), {
+          contentType: getMimeType(format),
+          upsert: true,
+        });
+
+      if (uploadError) {
+        return { result: { error: uploadError.message }, taskType: "file_creation", taskDescription: `Failed to create ${filename}` };
+      }
+
+      const { data: signedUrl } = await adminClient.storage
+        .from("user-files")
+        .createSignedUrl(storagePath, 86400);
+
+      return {
+        result: { filename, url: signedUrl?.signedUrl, format, size: content.length },
+        taskType: "file_creation",
+        taskDescription: `Created ${filename}`,
+      };
+    }
     case "create_todos":
     case "update_todo":
       // Handled inline in the agentic loop, not here
@@ -518,6 +569,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   web_search: "Searching the web...",
   create_todos: "Setting up task list...",
   update_todo: "Updating task...",
+  create_file: "Creating file...",
 };
 
 const encoder = new TextEncoder();
@@ -792,7 +844,15 @@ MULTI-ACTION BEHAVIOR:
 - When a user request involves multiple related actions, execute them all in sequence using your tools.
 - Example: "Add a new listing at 123 Oak Ave for buyer Mike Torres, list price 450k" should trigger: create_todos first, then create_deal, then search_contacts for Mike Torres, then add_contact if not found, then offer to draft a social post.
 - You have up to 5 tool calls per message. Use them.
-- After completing a chain of actions, summarize everything you did in a clear list.`;
+- After completing a chain of actions, summarize everything you did in a clear list.
+
+FILE CREATION:
+- When the user asks you to write a report, analysis, or any deliverable, create an actual file using create_file.
+- Don't just output long content as chat text. Create a downloadable file instead.
+- Use markdown format by default for reports and analyses.
+- Use CSV for data exports and lists.
+- Use HTML for formatted content that needs styling.
+- Always mention the filename when you create a file.`;
 
     const apiMessages = [
       ...history.map((m: { role: string; content: string; metadata?: { tools?: { tool: string; input: Record<string, unknown>; result_summary?: string }[] } }) => {
@@ -989,6 +1049,16 @@ MULTI-ACTION BEHAVIOR:
                 );
 
                 sendSSE(controller, "tool_done", { tool: tool.name, result_summary: summarizeToolResult(tool.name, result, taskDescription), success: !(result as any)?.error });
+
+                // Stream file_created event for create_file tool
+                if (tool.name === "create_file" && result && typeof result === "object" && (result as any).url) {
+                  sendSSE(controller, "file_created", {
+                    filename: (result as any).filename,
+                    url: (result as any).url,
+                    format: (result as any).format,
+                    size: (result as any).size,
+                  });
+                }
 
                 // Log to task_history (fire and forget)
                 adminClient.from("task_history").insert({
