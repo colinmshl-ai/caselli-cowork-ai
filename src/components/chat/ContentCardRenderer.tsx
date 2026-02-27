@@ -3,7 +3,11 @@ import SocialPostCard from "./SocialPostCard";
 import EmailCard from "./EmailCard";
 import ListingCard from "./ListingCard";
 import DealSummaryCard from "./DealSummaryCard";
+import ConversationalRenderer from "./ConversationalRenderer";
 import { Separator } from "@/components/ui/separator";
+
+const PROSE_CLASSES =
+  "prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-1 prose-ul:pl-4 prose-headings:my-2 prose-strong:text-foreground prose-a:text-primary text-foreground";
 
 type ContentTypeHint = "social_post" | "email" | "listing_description" | "conversational" | string;
 
@@ -258,7 +262,7 @@ function renderSection(
       return (
         <>
           {intro && (
-            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+            <div className={PROSE_CLASSES}>
               <ReactMarkdown>{intro}</ReactMarkdown>
             </div>
           )}
@@ -271,7 +275,7 @@ function renderSection(
       return (
         <>
           {intro && (
-            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+            <div className={PROSE_CLASSES}>
               <ReactMarkdown>{intro}</ReactMarkdown>
             </div>
           )}
@@ -284,7 +288,7 @@ function renderSection(
       return (
         <>
           {intro && (
-            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+            <div className={PROSE_CLASSES}>
               <ReactMarkdown>{intro}</ReactMarkdown>
             </div>
           )}
@@ -294,22 +298,14 @@ function renderSection(
     }
   }
 
-  // If hint says conversational, skip card detection entirely
+  // If hint says conversational, use enhanced conversational renderer
   if (contentTypeHint === "conversational") {
-    return (
-      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
-        <ReactMarkdown>{section}</ReactMarkdown>
-      </div>
-    );
+    return <ConversationalRenderer content={section} onAction={onAction} />;
   }
 
   // Fallback: no hint (old messages) — use tightened regex with conversational guard
   if (detectConversational(section)) {
-    return (
-      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
-        <ReactMarkdown>{section}</ReactMarkdown>
-      </div>
-    );
+    return <ConversationalRenderer content={section} onAction={onAction} />;
   }
 
   if (detectSocial(section)) {
@@ -317,9 +313,9 @@ function renderSection(
     return (
       <>
         {intro && (
-          <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
-            <ReactMarkdown>{intro}</ReactMarkdown>
-          </div>
+          <div className={PROSE_CLASSES}>
+              <ReactMarkdown>{intro}</ReactMarkdown>
+            </div>
         )}
         <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
       </>
@@ -331,9 +327,9 @@ function renderSection(
     return (
       <>
         {intro && (
-          <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
-            <ReactMarkdown>{intro}</ReactMarkdown>
-          </div>
+          <div className={PROSE_CLASSES}>
+              <ReactMarkdown>{intro}</ReactMarkdown>
+            </div>
         )}
         <EmailCard to={to} subject={subject} body={body} onAction={onAction} contentType={contentType} />
       </>
@@ -345,9 +341,9 @@ function renderSection(
     return (
       <>
         {intro && (
-          <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
-            <ReactMarkdown>{intro}</ReactMarkdown>
-          </div>
+          <div className={PROSE_CLASSES}>
+              <ReactMarkdown>{intro}</ReactMarkdown>
+            </div>
         )}
         <DealSummaryCard intro={intro} deals={deals} deadlines={deadlines} />
       </>
@@ -359,9 +355,9 @@ function renderSection(
     return (
       <>
         {intro && (
-          <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
-            <ReactMarkdown>{intro}</ReactMarkdown>
-          </div>
+          <div className={PROSE_CLASSES}>
+              <ReactMarkdown>{intro}</ReactMarkdown>
+            </div>
         )}
         <ListingCard address={address} stats={stats} description={description} onAction={onAction} contentType={contentType} />
       </>
@@ -370,7 +366,7 @@ function renderSection(
 
   // Plain markdown
   return (
-    <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+    <div className={PROSE_CLASSES}>
       <ReactMarkdown>{section}</ReactMarkdown>
     </div>
   );
