@@ -382,7 +382,7 @@ const Settings = () => {
 };
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="mb-12">
+  <div className="mb-8">
     <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">{title}</h2>
     <div className="space-y-4">{children}</div>
   </div>

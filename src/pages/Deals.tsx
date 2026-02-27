@@ -150,8 +150,9 @@ const Deals = () => {
       {/* Content */}
       {isLoading ? (
         <div className="px-5 py-5 space-y-1">
+
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 py-3.5 border-b border-border">
+            <div key={i} className="flex items-center gap-4 py-3 border-b border-border">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-4 w-2/5" />
@@ -183,7 +184,7 @@ const Deals = () => {
               <button
                 key={deal.id}
                 onClick={() => openEdit(deal)}
-                className="w-full border-b border-border px-5 py-3.5 text-left transition-all duration-200 hover:bg-secondary/50 min-h-[44px]"
+                className="w-full border-b border-border px-5 py-3 text-left transition-all duration-200 hover:bg-secondary/50 min-h-[44px]"
               >
                 {/* Mobile */}
                 <div className="md:hidden">

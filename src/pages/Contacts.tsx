@@ -179,8 +179,9 @@ const Contacts = () => {
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="px-5 py-5 space-y-1">
+
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 py-3.5 border-b border-border">
+              <div key={i} className="flex items-center gap-4 py-3 border-b border-border">
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-4 w-2/5" />
                   <Skeleton className="h-3 w-1/3" />
@@ -210,7 +211,7 @@ const Contacts = () => {
                 <button
                   key={c.id}
                   onClick={() => openEdit(c)}
-                  className="w-full border-b border-border px-5 py-3.5 text-left transition-all duration-200 hover:bg-secondary/50 min-h-[44px]"
+                  className="w-full border-b border-border px-5 py-3 text-left transition-all duration-200 hover:bg-secondary/50 min-h-[44px]"
                 >
                   {/* Mobile card layout */}
                   <div className="md:hidden">
