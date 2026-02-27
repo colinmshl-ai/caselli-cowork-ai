@@ -49,9 +49,13 @@ function detectDealSummary(content: string) {
 }
 
 function detectSocial(content: string) {
-  const firstTwoLines = content.split("\n").slice(0, 2).join("\n");
-  // Require platform name followed by Post:/Caption: in a header pattern at the start
-  const hasPlatformHeader = /\*?\*?\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b\s*(Post|Caption)\s*:?\*?\*?/i.test(firstTwoLines);
+  // Normalize: force newline before platform headers so detection works even if inline
+  const normalized = content.replace(
+    /([^\n])(\*{0,2}(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\s*(Post|Caption)\s*:?\*{0,2})/gi,
+    '$1\n\n$2'
+  );
+  const firstThreeLines = normalized.split("\n").filter(l => l.trim()).slice(0, 3).join("\n");
+  const hasPlatformHeader = /\*?\*?\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b\s*(Post|Caption)\s*:?\*?\*?/i.test(firstThreeLines);
   const hasHashtags = /#\w+/.test(content);
   return hasPlatformHeader && hasHashtags;
 }
@@ -65,8 +69,22 @@ function detectListing(content: string) {
   return hasAddressLine && hasBedBathLine;
 }
 
+function stripTrailingSuggestions(text: string): { cleaned: string; suggestions: string } {
+  const idx = text.search(/\n\s*(?:next\s+steps|would you like|want me to|I can also|here are some|shall I|let me know|happy to)/i);
+  if (idx > 0) {
+    return { cleaned: text.slice(0, idx).trim(), suggestions: text.slice(idx).trim() };
+  }
+  return { cleaned: text, suggestions: "" };
+}
+
 function parseEmail(content: string) {
-  const cleanContent = content.replace(/\*\*(To|Subject|From):\*\*/gi, "$1:");
+  // Force separation before email headers
+  const normalizedContent = content.replace(
+    /([^\n])(\*{0,2}(To|Subject|From)\s*:\s*\*{0,2})/gi,
+    '$1\n\n$2'
+  );
+
+  const cleanContent = normalizedContent.replace(/\*\*(To|Subject|From):\*\*/gi, "$1:");
   const toMatch = cleanContent.match(/To:\s*(.+)/i);
   const subjectMatch = cleanContent.match(/Subject:\s*(.+)/i);
 
@@ -86,24 +104,42 @@ function parseEmail(content: string) {
     .trim();
   body = body.replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
 
+  // Strip trailing suggestions from body
+  const { cleaned: cleanBody, suggestions } = stripTrailingSuggestions(body);
+  body = cleanBody;
+
   const firstHeaderIdx = Math.min(
     toMatch ? cleanContent.indexOf(toMatch[0]) : Infinity,
     subjectMatch ? cleanContent.indexOf(subjectMatch[0]) : Infinity
   );
-  const intro = content.slice(0, firstHeaderIdx).trim();
+  let intro = normalizedContent.slice(0, firstHeaderIdx).trim();
+  if (suggestions) {
+    intro = intro + (intro ? '\n\n' : '') + suggestions;
+  }
 
   return { intro, to, subject, body };
 }
 
 function parseSocial(content: string) {
-  const platformMatch = content.match(/\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b/i);
+  // Force separation before platform headers so intro text doesn't run into card
+  const normalizedContent = content.replace(
+    /([^\n])(\*{0,2}(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\s*(Post|Caption)\s*:?\*{0,2})/gi,
+    '$1\n\n$2'
+  );
+
+  const platformMatch = normalizedContent.match(/\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b/i);
   const platform = platformMatch?.[1] || "Social";
 
-  const lines = content.split("\n");
+  const lines = normalizedContent.split("\n");
   let splitIdx = -1;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+    // Match platform header lines like "**Instagram Post:**"
+    if (/\*?\*?\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b\s*(Post|Caption)\s*:?\*?\*?/i.test(line)) {
+      splitIdx = i;
+      break;
+    }
     if (/(:|\bhere'?s?\b)/i.test(line) && /draft|post|caption/i.test(line)) {
       splitIdx = i;
       break;
@@ -114,13 +150,20 @@ function parseSocial(content: string) {
     return { intro: lines[0], platform, postContent: lines.slice(1).join("\n").trim() };
   }
 
-  const intro = lines.slice(0, splitIdx + 1).join("\n").trim();
+  let intro = lines.slice(0, splitIdx).join("\n").trim();
   let postContent = lines.slice(splitIdx + 1).join("\n").trim();
 
   postContent = postContent
     .replace(/^["`\*]+|["`\*]+$/g, "")
     .replace(/\*\*(.+?)\*\*/g, "$1")
     .trim();
+
+  // Strip next steps / suggestions from post content
+  const { cleaned, suggestions } = stripTrailingSuggestions(postContent);
+  postContent = cleaned;
+  if (suggestions) {
+    intro = intro + (intro ? '\n\n' : '') + suggestions;
+  }
 
   return { intro, platform, postContent };
 }
@@ -164,8 +207,15 @@ function parseListing(content: string) {
     }
   }
 
-  const intro = lines.slice(0, introEnd).join("\n").trim();
-  const description = lines.slice(descStart).join("\n").trim();
+  let intro = lines.slice(0, introEnd).join("\n").trim();
+  let description = lines.slice(descStart).join("\n").trim();
+
+  // Strip trailing suggestions from listing description
+  const { cleaned, suggestions } = stripTrailingSuggestions(description);
+  description = cleaned;
+  if (suggestions) {
+    intro = intro + (intro ? '\n\n' : '') + suggestions;
+  }
 
   return { intro, address, stats: statsLine, description };
 }
