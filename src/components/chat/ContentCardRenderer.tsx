@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import SocialPostCard from "./SocialPostCard";
 import EmailCard from "./EmailCard";
 import ListingCard from "./ListingCard";
+import DealSummaryCard from "./DealSummaryCard";
 import { Separator } from "@/components/ui/separator";
 
 interface ContentCardRendererProps {
@@ -15,6 +16,13 @@ function detectEmail(content: string) {
   const hasRecipient = /\*?\*?To:?\*?\*?\s*(.+)/i.test(content) || /\b(Dear |Hi |Hello |Hey )\w/i.test(content);
   const hasClosing = /Best|Sincerely|Regards|Thanks|Warm regards/i.test(content);
   return hasSubject || (hasRecipient && hasClosing);
+}
+
+function detectDealSummary(content: string) {
+  const hasPipeline = /pipeline|active deals?|deal summary/i.test(content);
+  const hasStage = /\b(lead|active|under.?contract|due.?diligence|clear.?to.?close|closed|pending)\b/i.test(content);
+  const hasDeadline = /deadline|closing|inspection|appraisal|financing/i.test(content);
+  return hasPipeline && (hasStage || hasDeadline);
 }
 
 function detectSocial(content: string) {
@@ -116,7 +124,6 @@ function parseListing(content: string) {
   }
 
   if (!address) {
-    // Try "at [address]" pattern
     const atMatch = content.match(/\bat\s+(\d+\s+[A-Z][\w\s,]+)/i);
     if (atMatch) {
       address = atMatch[1].replace(/[*#]+/g, "").trim();
@@ -138,10 +145,76 @@ function parseListing(content: string) {
   return { intro, address, stats: statsLine, description };
 }
 
+function parseDealSummary(content: string) {
+  const lines = content.split("\n");
+  const deals: { address: string; client?: string; stage?: string; price?: string }[] = [];
+  const deadlines: { label: string; date: string; daysUntil: number }[] = [];
+  const introLines: string[] = [];
+  let pastIntro = false;
+
+  const stagePattern = /\b(lead|active|under[\s_]?contract|due[\s_]?diligence|clear[\s_]?to[\s_]?close|closed|fell[\s_]?through|pending)\b/i;
+  const pricePattern = /\$[\d,]+/;
+  const addressPattern = /^\d+\s+\w+/;
+  const deadlinePattern = /\b(closing|inspection|appraisal|financing|deadline)\b[:\s]*(.+)/i;
+  const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\w+ \d{1,2},?\s*\d{4}|\d{4}-\d{2}-\d{2})/;
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/[*#]+/g, "").replace(/^[-•]\s*/, "").trim();
+    if (!line) continue;
+
+    // Check for deal rows: lines with an address or a stage indicator
+    const hasAddress = addressPattern.test(line);
+    const stageMatch = line.match(stagePattern);
+    const priceMatch = line.match(pricePattern);
+
+    if (hasAddress || (stageMatch && priceMatch)) {
+      pastIntro = true;
+      const deal: { address: string; client?: string; stage?: string; price?: string } = {
+        address: hasAddress ? line.split(/[|·—–,]/)  [0].trim() : line.split(/[|·—–,]/)[0].trim(),
+      };
+
+      if (stageMatch) deal.stage = stageMatch[1];
+      if (priceMatch) deal.price = priceMatch[0];
+
+      // Try to extract client name: "Client: Name" or "for Name"
+      const clientMatch = line.match(/client:?\s*([^|·,]+)/i) || line.match(/for\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+      if (clientMatch) deal.client = clientMatch[1].trim();
+
+      deals.push(deal);
+      continue;
+    }
+
+    // Check for deadline lines
+    const dlMatch = line.match(deadlinePattern);
+    if (dlMatch) {
+      pastIntro = true;
+      const dateMatch = dlMatch[2].match(datePattern);
+      if (dateMatch) {
+        const parsed = new Date(dateMatch[1]);
+        const now = new Date();
+        const diffMs = parsed.getTime() - now.getTime();
+        const daysUntil = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+        deadlines.push({
+          label: `${dlMatch[1].charAt(0).toUpperCase()}${dlMatch[1].slice(1).toLowerCase()} — ${line.split(/[|·—–]/)[0].trim()}`,
+          date: dateMatch[1],
+          daysUntil,
+        });
+      }
+      continue;
+    }
+
+    if (!pastIntro) {
+      introLines.push(rawLine);
+    }
+  }
+
+  return { intro: introLines.join("\n").trim(), deals, deadlines };
+}
+
 /** Split content into sections on "---" horizontal rules */
 function splitSections(content: string): string[] {
   const parts = content.split(/\n---+\n/);
-  // Also split on triple-newline boundaries between distinct content types
   const result: string[] = [];
   for (const part of parts) {
     const trimmed = part.trim();
@@ -161,6 +234,20 @@ function renderSection(section: string, onAction?: (message: string) => void, co
           </div>
         )}
         <EmailCard to={to} subject={subject} body={body} onAction={onAction} contentType={contentType} />
+      </>
+    );
+  }
+
+  if (detectDealSummary(section)) {
+    const { intro, deals, deadlines } = parseDealSummary(section);
+    return (
+      <>
+        {intro && (
+          <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+            <ReactMarkdown>{intro}</ReactMarkdown>
+          </div>
+        )}
+        <DealSummaryCard intro={intro} deals={deals} deadlines={deadlines} />
       </>
     );
   }
