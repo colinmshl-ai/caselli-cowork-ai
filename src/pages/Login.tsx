@@ -87,7 +87,12 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               className="w-full rounded-lg border border-border bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground"
-            />
+           />
+          </div>
+          <div className="flex justify-end">
+            <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              Forgot password?
+            </Link>
           </div>
 
           <button

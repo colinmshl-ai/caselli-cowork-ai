@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import DealSlideOver from "@/components/deals/DealSlideOver";
 import DealBoardView from "@/components/deals/DealBoardView";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LayoutList, Columns3, Inbox } from "lucide-react";
+import { LayoutList, Columns3, Search, Plus } from "lucide-react";
 
 const STAGES = [
   { value: "all", label: "All" },
@@ -57,6 +57,7 @@ const Deals = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
   const [slideOpen, setSlideOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<any>(null);
@@ -103,7 +104,6 @@ const Deals = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-base font-semibold text-foreground">Deals</h1>
           <div className="flex items-center gap-2">
-            {/* View toggle */}
             <div className="flex rounded-lg border border-border overflow-hidden">
               <button
                 onClick={() => setViewMode("list")}
@@ -127,6 +127,18 @@ const Deals = () => {
               Add Deal
             </button>
           </div>
+        </div>
+
+        {/* Search */}
+        <div className="mt-3 relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search deals…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-border bg-transparent py-2.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground"
+          />
         </div>
 
         {/* Filters — only in list view */}
@@ -164,17 +176,36 @@ const Deals = () => {
             </div>
           ))}
         </div>
-      ) : viewMode === "board" ? (
-        <DealBoardView deals={deals} onEditDeal={openEdit} />
-      ) : deals.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Inbox size={48} className="text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">No deals yet</p>
-          <button onClick={openNew} className="text-sm font-medium text-primary hover:opacity-70 transition-opacity">
-            Add your first deal
-          </button>
-        </div>
-      ) : (
+      ) : (() => {
+        const searchLower = search.toLowerCase();
+        const filtered = search
+          ? deals.filter((d) =>
+              d.property_address.toLowerCase().includes(searchLower) ||
+              (d.client_name && d.client_name.toLowerCase().includes(searchLower)) ||
+              (d.notes && d.notes.toLowerCase().includes(searchLower))
+            )
+          : deals;
+
+        if (viewMode === "board") return <DealBoardView deals={filtered} onEditDeal={openEdit} />;
+
+        if (filtered.length === 0) return (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Plus size={32} className="text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-foreground">
+              {search ? "No matching deals" : "No deals yet"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {search ? "Try adjusting your search or filter" : "Add your first deal to get started"}
+            </p>
+            {!search && filter === "all" && (
+              <button onClick={openNew} className="mt-3 text-sm font-medium text-primary hover:opacity-70 transition-opacity">
+                Add deal
+              </button>
+            )}
+          </div>
+        );
+
+        return (
         <div className="flex-1 overflow-y-auto">
           {deals.map((deal) => {
             const colors = STAGE_COLORS[deal.stage] || STAGE_COLORS.closed;
@@ -238,7 +269,8 @@ const Deals = () => {
             );
           })}
         </div>
-      )}
+        );
+      })()}
 
       <DealSlideOver
         open={slideOpen}

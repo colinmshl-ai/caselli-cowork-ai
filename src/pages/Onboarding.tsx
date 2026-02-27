@@ -138,8 +138,14 @@ const Onboarding = () => {
     }
   };
 
-  const goNext = () => setStep((s) => s + 1);
-  const goBack = () => setStep((s) => s - 1);
+  const goNext = () => {
+    // Skip step 4 (integrations - coming soon)
+    setStep((s) => s === 3 ? 5 : s + 1);
+  };
+  const goBack = () => {
+    setStep((s) => s === 5 ? 3 : s - 1);
+  };
+  
 
   const hasVendors = !!(titleCompany || inspector || photographer || lender);
 
@@ -161,10 +167,10 @@ const Onboarding = () => {
         <div className="h-1 w-full rounded-full bg-secondary">
           <div
             className="h-1 rounded-full bg-primary transition-all duration-500 ease-out"
-            style={{ width: `${(step / 5) * 100}%` }}
+            style={{ width: `${((step <= 3 ? step : 4) / 4) * 100}%` }}
           />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground text-right">Step {step} of 5</p>
+        <p className="mt-2 text-xs text-muted-foreground text-right">Step {step <= 3 ? step : 4} of 4</p>
       </div>
 
       {/* Animated step wrapper */}

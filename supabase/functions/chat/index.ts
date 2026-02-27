@@ -190,7 +190,7 @@ async function executeTool(
       if (cleanUpdates.list_price) cleanUpdates.list_price = Number(cleanUpdates.list_price);
 
       // Validate stage
-      const VALID_STAGES = ["lead", "active", "under_contract", "due_diligence", "clear_to_close", "closed", "fell_through"];
+      const VALID_STAGES = ["lead", "active_client", "under_contract", "due_diligence", "clear_to_close", "closed", "fell_through"];
       if (cleanUpdates.stage && !VALID_STAGES.includes(cleanUpdates.stage as string)) {
         return {
           result: { error: `Invalid stage: ${cleanUpdates.stage}. Valid values: ${VALID_STAGES.join(", ")}` },
@@ -257,9 +257,19 @@ async function executeTool(
       };
     }
     case "create_deal": {
+      const dealData = {
+        user_id: userId,
+        property_address: toolInput.property_address as string,
+        client_name: (toolInput.client_name as string) || null,
+        client_email: (toolInput.client_email as string) || null,
+        deal_type: (toolInput.deal_type as string) || null,
+        stage: (toolInput.stage as string) || "lead",
+        list_price: toolInput.list_price ? Number(toolInput.list_price) : null,
+        notes: (toolInput.notes as string) || null,
+      };
       const { data, error } = await adminClient
         .from("deals")
-        .insert({ user_id: userId, ...toolInput })
+        .insert(dealData)
         .select()
         .single();
       return {
