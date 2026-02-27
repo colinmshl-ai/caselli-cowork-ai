@@ -205,7 +205,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           {topic === "general" && (
             <div className="grid grid-cols-2 gap-3">
               {stats.map((s) => (
-                <div key={s.label} className="bg-card border border-border rounded-lg p-3">
+                <div key={s.label} className="bg-card border border-border rounded-xl p-3">
                   <span className="text-lg font-semibold text-foreground">{s.value}</span>
                   <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
                 </div>
@@ -214,7 +214,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           )}
 
           {topic === "deals" && focusedDeal && (
-            <div className="border border-border rounded-lg p-4 shadow-sm space-y-1.5">
+            <div className="border border-border rounded-xl p-4 shadow-sm space-y-1.5">
               <p className="text-sm font-medium text-foreground">{focusedDeal.property_address}</p>
               <div className="flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full ${STAGE_COLORS[focusedDeal.stage] || "bg-muted-foreground"}`} />
@@ -235,7 +235,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           )}
 
           {topic === "contacts" && focusedContact && (
-            <div className="border border-border rounded-lg p-4 shadow-sm space-y-1.5">
+            <div className="border border-border rounded-xl p-4 shadow-sm space-y-1.5">
               <p className="text-sm font-medium text-foreground">{focusedContact.full_name}</p>
               <p className="text-xs text-muted-foreground capitalize">{focusedContact.contact_type}</p>
               {focusedContact.last_contacted && (

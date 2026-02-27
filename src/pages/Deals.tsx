@@ -104,17 +104,17 @@ const Deals = () => {
           <h1 className="text-base font-semibold text-foreground">Deals</h1>
           <div className="flex items-center gap-2">
             {/* View toggle */}
-            <div className="flex rounded-md border border-border overflow-hidden">
+            <div className="flex rounded-lg border border-border overflow-hidden">
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all duration-200 ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                className={`flex items-center justify-center h-9 w-9 transition-all duration-200 ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
                 aria-label="List view"
               >
                 <LayoutList size={16} />
               </button>
               <button
                 onClick={() => setViewMode("board")}
-                className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all duration-200 ${viewMode === "board" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                className={`flex items-center justify-center h-9 w-9 transition-all duration-200 ${viewMode === "board" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
                 aria-label="Board view"
               >
                 <Columns3 size={16} />
@@ -122,7 +122,7 @@ const Deals = () => {
             </div>
             <button
               onClick={openNew}
-              className="rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              className="rounded-lg bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
               Add Deal
             </button>
@@ -136,7 +136,7 @@ const Deals = () => {
               <button
                 key={s.value}
                 onClick={() => setFilter(s.value)}
-                className={`whitespace-nowrap rounded-md px-3 min-h-[44px] text-xs font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-lg px-3 min-h-[44px] text-xs font-medium transition-colors ${
                   filter === s.value ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -190,7 +190,7 @@ const Deals = () => {
                 <div className="md:hidden">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-foreground truncate">{deal.property_address}</span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${colors.bg} ${colors.text}`}>
+                    <span className={`shrink-0 rounded-lg px-2.5 py-0.5 text-[11px] font-medium ${colors.bg} ${colors.text}`}>
                       {STAGE_LABELS[deal.stage] || deal.stage}
                     </span>
                   </div>
@@ -201,7 +201,7 @@ const Deals = () => {
                     )}
                     {price && <span className="text-xs text-muted-foreground">{price}</span>}
                     {isDeadlineSoon(deal) && (
-                      <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                      <span className="whitespace-nowrap rounded-lg bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
                         Deadline soon
                       </span>
                     )}
@@ -221,11 +221,11 @@ const Deals = () => {
                   )}
                   {price && <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">{price}</span>}
                   {isDeadlineSoon(deal) && (
-                    <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 shrink-0">
+                    <span className="whitespace-nowrap rounded-lg bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 shrink-0">
                       Deadline soon
                     </span>
                   )}
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${colors.bg} ${colors.text}`}>
+                  <span className={`shrink-0 rounded-lg px-2.5 py-0.5 text-[11px] font-medium ${colors.bg} ${colors.text}`}>
                     {STAGE_LABELS[deal.stage] || deal.stage}
                   </span>
                   {deal.closing_date && (

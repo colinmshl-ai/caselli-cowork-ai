@@ -58,7 +58,7 @@ const SocialPostCard = ({ platform, content, onAction }: SocialPostCardProps) =>
   );
 
   return (
-    <div className="border border-border border-l-4 border-l-violet-400 rounded-md overflow-hidden bg-card mt-3 animate-fade-in-up">
+    <div className="border border-border border-l-4 border-l-violet-400 rounded-xl overflow-hidden bg-card mt-3 animate-fade-in-up">
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-border">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -88,7 +88,7 @@ const SocialPostCard = ({ platform, content, onAction }: SocialPostCardProps) =>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
                 onClick={() => onAction("Edit this post: make changes as needed")}
               >
                 <Pencil size={11} className="mr-1" />
@@ -99,7 +99,7 @@ const SocialPostCard = ({ platform, content, onAction }: SocialPostCardProps) =>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                    className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
                   >
                     <Share2 size={11} className="mr-1" />
                     Adapt

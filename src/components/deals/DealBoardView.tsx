@@ -67,7 +67,7 @@ const DealBoardView = ({ deals, onEditDeal }: DealBoardViewProps) => {
           return (
             <div
               key={stg.value}
-              className={`flex flex-col w-64 shrink-0 rounded-lg border transition-colors ${
+              className={`flex flex-col w-64 shrink-0 rounded-xl border transition-colors ${
                 dragOverStage === stg.value ? "border-primary bg-primary/5" : "border-border bg-secondary/30"
               }`}
               onDragOver={(e) => { e.preventDefault(); setDragOverStage(stg.value); }}
@@ -97,7 +97,7 @@ const DealBoardView = ({ deals, onEditDeal }: DealBoardViewProps) => {
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/plain", deal.id)}
                       onClick={() => onEditDeal(deal)}
-                      className="rounded-md border border-border bg-background p-2.5 cursor-pointer hover:border-primary/40 transition-colors"
+                      className="rounded-xl border border-border bg-background p-2.5 cursor-pointer hover:border-primary/40 transition-colors"
                     >
                       <p className="text-xs font-medium text-foreground truncate">{deal.property_address}</p>
                       {deal.client_name && (
@@ -105,7 +105,7 @@ const DealBoardView = ({ deals, onEditDeal }: DealBoardViewProps) => {
                       )}
                       <div className="flex items-center gap-2 mt-1.5">
                         {deal.deal_type && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground capitalize">
+                          <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-secondary text-muted-foreground capitalize">
                             {deal.deal_type}
                           </span>
                         )}

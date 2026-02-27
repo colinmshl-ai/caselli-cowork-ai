@@ -93,7 +93,7 @@ const SuggestionChips = ({ lastToolUsed, topic, onSend }: SuggestionChipsProps) 
         <button
           key={text}
           onClick={() => onSend(text)}
-          className="rounded-lg bg-secondary/60 px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary hover:scale-[1.02] transition-all duration-150 animate-fade-in"
+          className="rounded-lg bg-secondary/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary hover:scale-[1.02] transition-all duration-150 animate-fade-in"
           style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
         >
           {text}

@@ -46,7 +46,7 @@ interface ContactSlideOverProps {
 }
 
 const inputClass =
-  "w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground";
+  "w-full rounded-lg border border-border bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground";
 
 const ContactSlideOver = ({ open, contact, onClose, onSaved, onDelete }: ContactSlideOverProps) => {
   const { user } = useAuth();
@@ -186,13 +186,13 @@ const ContactSlideOver = ({ open, contact, onClose, onSaved, onDelete }: Contact
                 onClose();
                 navigate(`/chat?prompt=${encodeURIComponent(`Draft a professional email to ${contact.full_name}${contact.email ? ` (${contact.email})` : ""}`)}`);
               }}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary/50 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary/50 transition-colors"
             >
               <Mail size={13} /> Draft email
             </button>
             <button
               onClick={() => toast.info("Coming soon")}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary/50 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary/50 transition-colors"
             >
               <LinkIcon size={13} /> Add to deal
             </button>
@@ -201,7 +201,7 @@ const ContactSlideOver = ({ open, contact, onClose, onSaved, onDelete }: Contact
                 onClose();
                 navigate(`/chat?prompt=${encodeURIComponent(`Schedule a follow-up with ${contact.full_name} for next week`)}`);
               }}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary/50 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary/50 transition-colors"
             >
               <CalendarPlus size={13} /> Follow-up
             </button>
@@ -224,7 +224,7 @@ const ContactSlideOver = ({ open, contact, onClose, onSaved, onDelete }: Contact
           <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} className={cn(inputClass, "resize-none")} />
 
           <div className="flex items-center gap-4 pt-2">
-            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-md bg-primary min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-lg bg-primary min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
               {saving ? "Saving…" : "Save"}
             </button>
             <button onClick={onClose} className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
@@ -236,7 +236,7 @@ const ContactSlideOver = ({ open, contact, onClose, onSaved, onDelete }: Contact
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Linked Deals</h3>
               <div className="space-y-2">
                 {linkedDeals.map((d: any) => (
-                  <div key={d.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                  <div key={d.id} className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
                     <span className="text-sm text-foreground truncate">{d.property_address}</span>
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${STAGE_COLORS[d.stage] || STAGE_COLORS.lead}`}>
                       {d.stage}

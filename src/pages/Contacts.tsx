@@ -119,7 +119,7 @@ const Contacts = () => {
   };
 
   const TypeBadge = ({ type }: { type: string }) => (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TYPE_COLORS[type] || TYPE_COLORS.other}`}>
+    <span className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-[11px] font-medium ${TYPE_COLORS[type] || TYPE_COLORS.other}`}>
       {TYPE_LABELS[type] || type}
     </span>
   );
@@ -135,7 +135,7 @@ const Contacts = () => {
                 <TooltipTrigger asChild>
                   <button
                     disabled
-                    className="flex items-center gap-1.5 rounded-md border border-border px-3 min-h-[44px] py-2.5 text-sm font-medium text-muted-foreground opacity-60 cursor-not-allowed"
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-3 min-h-[44px] py-2.5 text-sm font-medium text-muted-foreground opacity-60 cursor-not-allowed"
                   >
                     <Upload size={14} />
                     Import
@@ -144,7 +144,7 @@ const Contacts = () => {
                 <TooltipContent>Coming soon</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <button onClick={openNew} className="rounded-md bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
+            <button onClick={openNew} className="rounded-lg bg-primary px-4 min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
               Add Contact
             </button>
           </div>
@@ -157,7 +157,7 @@ const Contacts = () => {
             placeholder="Search contacts…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-md border border-border bg-transparent py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground"
+            className="w-full rounded-lg border border-border bg-transparent py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground"
           />
         </div>
 
@@ -166,7 +166,7 @@ const Contacts = () => {
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`whitespace-nowrap rounded-md px-3 min-h-[44px] text-xs font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-lg px-3 min-h-[44px] text-xs font-medium transition-colors ${
                 filter === f.value ? "text-primary" : "text-muted-foreground hover:text-foreground"
               }`}
             >

@@ -29,14 +29,14 @@ const TypingIndicator = ({ status, completedTools }: { status: string; completed
     {completedTools.map((tool, i) => (
       <span
         key={i}
-        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-accent/10 text-accent-foreground animate-fade-in"
+        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-accent/10 text-accent-foreground animate-fade-in"
       >
         <span className="text-primary">✓</span>
         {tool}
       </span>
     ))}
     {status && (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary">
+      <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-primary/10 text-primary">
         <span className="flex gap-0.5">
           <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "0ms" }} />
           <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "200ms" }} />
@@ -712,7 +712,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim()}
-            className={`flex h-9 w-9 min-w-[44px] min-h-[44px] shrink-0 items-center justify-center transition-all duration-200 ${input.trim() ? "text-primary" : "text-muted-foreground"}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center transition-all duration-200 ${input.trim() ? "text-primary" : "text-muted-foreground"}`}
             aria-label="Send message"
           >
             <ArrowUp size={20} />

@@ -13,7 +13,7 @@ const ListingCard = ({ address, stats, description, onAction }: ListingCardProps
   const charCount = description.length;
 
   return (
-    <div className="border border-border border-l-4 border-l-emerald-400 rounded-md overflow-hidden bg-card mt-3 animate-fade-in-up">
+    <div className="border border-border border-l-4 border-l-emerald-400 rounded-xl overflow-hidden bg-card mt-3 animate-fade-in-up">
       <div className="px-4 py-3 border-b border-border">
         <div className="text-sm font-medium text-foreground">{address}</div>
         {stats && (
