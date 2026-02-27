@@ -54,9 +54,10 @@ const TASK_TYPE_ICONS: Record<string, React.ElementType> = {
 interface ActivityPanelProps {
   onQuickAction: (message: string) => void;
   conversationContext: ConversationContext;
+  isFloating?: boolean;
 }
 
-const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProps) => {
+const ActivityPanel = ({ onQuickAction, conversationContext, isFloating }: ActivityPanelProps) => {
   const { user } = useAuth();
   const now = new Date();
   const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -160,7 +161,6 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
   });
   const deadlinesThisWeek = upcomingDeadlines.length;
 
-  // Actionable items: deals needing follow-up (no activity in 7 days) + approaching deadlines (next 3 days)
   const threeDaysOut = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
   const urgentDeadlines = upcomingDeadlines.filter((dl) => new Date(dl.date!) <= threeDaysOut).length;
   const dealsNeedingFollowUp = activeDealsList.filter((d) => {
@@ -169,21 +169,18 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
     return updated < sevenDaysAgo;
   }).length;
   const actionItems = urgentDeadlines + dealsNeedingFollowUp;
-
   const newLeads = recentLeadContacts.length;
 
   const stats = [
     { label: "Active Deals", value: activeDeals },
-    { label: "Deadlines This Week", value: deadlinesThisWeek },
+    { label: "Deadlines", value: deadlinesThisWeek },
     { label: "Action Items", value: actionItems },
     { label: "New Leads", value: newLeads },
   ];
 
-  // Generate briefing summary text
   const generateBriefingSummary = () => {
     if (activeDeals === 0) return null;
     const parts: string[] = [];
-    // Mention top deal
     const topDeal = activeDealsList[0];
     if (topDeal) {
       const price = topDeal.contract_price || topDeal.list_price;
@@ -191,14 +188,12 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
       const stageStr = topDeal.stage.replace("_", " ");
       parts.push(`Your ${topDeal.property_address.split(",")[0]} deal is ${stageStr}${priceStr}.`);
     }
-    // Deadlines
     if (deadlinesThisWeek === 0) {
       parts.push("No deadlines this week.");
     } else {
       const next = upcomingDeadlines.sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())[0];
       parts.push(`Next deadline: ${next.label} for ${next.address.split(",")[0]} on ${format(new Date(next.date!), "MMM d")}.`);
     }
-    // Follow-ups
     if (dealsNeedingFollowUp > 0) {
       parts.push(`${dealsNeedingFollowUp} deal${dealsNeedingFollowUp > 1 ? "s" : ""} need${dealsNeedingFollowUp === 1 ? "s" : ""} follow-up.`);
     }
@@ -220,158 +215,147 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
     return deadlines[0] || null;
   };
 
-  const getTaskIcon = (taskType: string) => {
-    const IconComponent = TASK_TYPE_ICONS[taskType] || Activity;
-    return <IconComponent size={14} className="text-muted-foreground shrink-0 mt-0.5" />;
-  };
-
   const quickActions = topic === "deals" ? DEAL_ACTIONS : topic === "content" ? CONTENT_ACTIONS : topic === "contacts" ? CONTACT_ACTIONS : DEFAULT_ACTIONS;
   const sectionTitle = topic === "deals" ? "Deal Focus" : topic === "content" ? "Content Toolkit" : topic === "contacts" ? "Contact Focus" : "Quick Actions";
 
   return (
-    <>
-      <div className="border-b border-border px-5 py-4">
-        <h1 className="text-base font-semibold text-foreground">Activity</h1>
+    <div className="px-4 py-4 space-y-4">
+      {/* Greeting */}
+      <div>
+        <h2 className="text-base font-semibold text-foreground">
+          {greeting}, {displayName}
+        </h2>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          {format(now, "EEEE, MMMM d")}
+        </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-5">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            {greeting}, {displayName}
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {format(now, "EEEE, MMMM d")}
-          </p>
-        </div>
-
-        <div className="pt-1" />
-
-        <div key={topic} className="mt-6 transition-opacity duration-200 animate-in fade-in">
-          {topic === "general" && (
-            hasNoData ? (
-              <div className="border border-border rounded-xl p-5 text-center space-y-3">
-                <Home size={28} className="mx-auto text-muted-foreground" />
-                <p className="text-sm font-medium text-foreground">Welcome to Caselli!</p>
-                <p className="text-xs text-muted-foreground">Get started by adding your first deal or contact. I can help you track deadlines, draft emails, and manage your pipeline.</p>
-                <div className="space-y-0.5 pt-1">
-                  {[
-                    { label: "Add your first deal", message: "Help me add a new deal to my pipeline." },
-                    { label: "Import contacts", message: "Help me add my key contacts." },
-                  ].map((a) => (
-                    <button
-                      key={a.label}
-                      onClick={() => onQuickAction(a.message)}
-                      className="flex w-full items-center justify-between text-left text-sm text-foreground bg-transparent hover:bg-secondary/50 rounded-lg min-h-[44px] min-w-[44px] px-3 py-2.5 transition-all duration-200"
-                    >
-                      <span>{a.label}</span>
-                      <ChevronRight size={14} className="text-muted-foreground shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  {stats.map((s) => (
-                    <div key={s.label} className="bg-card border border-border rounded-xl p-3">
-                      <span className="text-lg font-semibold text-foreground">{s.value}</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
-                    </div>
-                  ))}
-                </div>
-                {briefingSummary && (
-                  <p className="text-sm text-muted-foreground leading-relaxed px-0.5">
-                    {briefingSummary}
-                  </p>
-                )}
-              </div>
-            )
-          )}
-
-          {topic === "deals" && focusedDeal && (
-            <div className="border border-border rounded-xl p-4 shadow-sm space-y-1.5">
-              <p className="text-sm font-medium text-foreground">{focusedDeal.property_address}</p>
-              <div className="flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${STAGE_COLORS[focusedDeal.stage] || "bg-muted-foreground"}`} />
-                <span className="text-xs text-muted-foreground capitalize">{focusedDeal.stage.replace("_", " ")}</span>
-              </div>
-              {(() => {
-                const next = getNextDeadline(focusedDeal);
-                return next ? (
-                  <p className="text-xs text-muted-foreground">
-                    Next: {next.label} — {format(new Date(next.date!), "MMM d")}
-                  </p>
-                ) : null;
-              })()}
-              {focusedDeal.client_name && (
-                <p className="text-xs text-muted-foreground">Client: {focusedDeal.client_name}</p>
-              )}
-            </div>
-          )}
-
-          {topic === "contacts" && focusedContact && (
-            <div className="border border-border rounded-xl p-4 shadow-sm space-y-1.5">
-              <p className="text-sm font-medium text-foreground">{focusedContact.full_name}</p>
-              <p className="text-xs text-muted-foreground capitalize">{focusedContact.contact_type}</p>
-              {focusedContact.last_contacted && (
-                <p className="text-xs text-muted-foreground">
-                  Last contacted: {formatDistanceToNow(new Date(focusedContact.last_contacted), { addSuffix: true })}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="mt-6">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
-              {sectionTitle}
-            </h3>
-            <div className="space-y-0.5">
-              {quickActions.map((a) => (
-                <button
-                  key={a.label}
-                  onClick={() => onQuickAction(a.message)}
-                  className="flex w-full items-center justify-between text-left text-sm text-foreground bg-transparent hover:bg-secondary/50 rounded-lg min-h-[44px] min-w-[44px] px-3 py-2.5 transition-all duration-200"
-                >
-                  <span>{a.label}</span>
-                  <ChevronRight size={14} className="text-muted-foreground shrink-0" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
-            Recent Activity
-          </h3>
-          {taskHistory.length === 0 ? (
-            <div className="flex flex-col items-center py-8">
-              <Activity size={24} className="text-muted-foreground mb-2" />
-              <p className="text-xs text-muted-foreground">No activity yet</p>
-            </div>
-          ) : (
-            <div className="relative ml-[3px]">
-              {/* Timeline line */}
-              <div className="absolute left-0 top-1 bottom-1 w-px bg-border" />
-              <div className="space-y-0">
-                {taskHistory.map((t) => (
-                  <div key={t.id} className="flex items-start gap-3 py-2 relative">
-                    {/* Dot */}
-                    <div className="relative z-10 mt-1.5 h-1.5 w-1.5 rounded-full bg-border shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-foreground leading-snug truncate">{t.description || t.task_type}</p>
-                      <span className="text-[10px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                  </div>
+      <div key={topic} className="transition-opacity duration-200 animate-in fade-in space-y-4">
+        {topic === "general" && (
+          hasNoData ? (
+            <div className="rounded-xl border border-border bg-card p-4 text-center space-y-2">
+              <Home size={24} className="mx-auto text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">Welcome to Caselli!</p>
+              <p className="text-[11px] text-muted-foreground">Get started by adding your first deal or contact.</p>
+              <div className="space-y-0.5 pt-1">
+                {[
+                  { label: "Add your first deal", message: "Help me add a new deal to my pipeline." },
+                  { label: "Import contacts", message: "Help me add my key contacts." },
+                ].map((a) => (
+                  <button
+                    key={a.label}
+                    onClick={() => onQuickAction(a.message)}
+                    className="flex w-full items-center justify-between text-left text-sm text-foreground bg-transparent hover:bg-secondary/50 rounded-lg min-h-[40px] px-3 py-2 transition-all duration-200"
+                  >
+                    <span>{a.label}</span>
+                    <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+                  </button>
                 ))}
               </div>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Stats grid */}
+              <div className="grid grid-cols-2 gap-2">
+                {stats.map((s) => (
+                  <div key={s.label} className="rounded-xl border border-border bg-card p-3">
+                    <span className="text-lg font-semibold text-foreground">{s.value}</span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+              {briefingSummary && (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {briefingSummary}
+                </p>
+              )}
+            </>
+          )
+        )}
+
+        {topic === "deals" && focusedDeal && (
+          <div className="rounded-xl border border-border bg-card p-3.5 space-y-1.5">
+            <p className="text-sm font-medium text-foreground">{focusedDeal.property_address}</p>
+            <div className="flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${STAGE_COLORS[focusedDeal.stage] || "bg-muted-foreground"}`} />
+              <span className="text-[11px] text-muted-foreground capitalize">{focusedDeal.stage.replace("_", " ")}</span>
+            </div>
+            {(() => {
+              const next = getNextDeadline(focusedDeal);
+              return next ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Next: {next.label} — {format(new Date(next.date!), "MMM d")}
+                </p>
+              ) : null;
+            })()}
+            {focusedDeal.client_name && (
+              <p className="text-[11px] text-muted-foreground">Client: {focusedDeal.client_name}</p>
+            )}
+          </div>
+        )}
+
+        {topic === "contacts" && focusedContact && (
+          <div className="rounded-xl border border-border bg-card p-3.5 space-y-1.5">
+            <p className="text-sm font-medium text-foreground">{focusedContact.full_name}</p>
+            <p className="text-[11px] text-muted-foreground capitalize">{focusedContact.contact_type}</p>
+            {focusedContact.last_contacted && (
+              <p className="text-[11px] text-muted-foreground">
+                Last contacted: {formatDistanceToNow(new Date(focusedContact.last_contacted), { addSuffix: true })}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Quick actions */}
+        <div>
+          <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            {sectionTitle}
+          </h3>
+          <div className="space-y-0.5">
+            {quickActions.map((a) => (
+              <button
+                key={a.label}
+                onClick={() => onQuickAction(a.message)}
+                className="flex w-full items-center justify-between text-left text-sm text-foreground bg-transparent hover:bg-secondary/50 rounded-lg min-h-[40px] px-3 py-2 transition-all duration-200"
+              >
+                <span>{a.label}</span>
+                <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    </>
+
+      {/* Recent activity */}
+      <div>
+        <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+          Recent Activity
+        </h3>
+        {taskHistory.length === 0 ? (
+          <div className="flex flex-col items-center py-6">
+            <Activity size={20} className="text-muted-foreground mb-1.5" />
+            <p className="text-[11px] text-muted-foreground">No activity yet</p>
+          </div>
+        ) : (
+          <div className="relative ml-[3px]">
+            <div className="absolute left-0 top-1 bottom-1 w-px bg-border" />
+            <div className="space-y-0">
+              {taskHistory.map((t) => (
+                <div key={t.id} className="flex items-start gap-3 py-1.5 relative">
+                  <div className="relative z-10 mt-1.5 h-1.5 w-1.5 rounded-full bg-border shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-foreground leading-snug truncate">{t.description || t.task_type}</p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

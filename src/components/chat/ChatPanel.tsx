@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, MutableRefObject } from "reac
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, ArrowUp, Clock, Search, Home, Camera, BarChart3, Users, RotateCcw } from "lucide-react";
+import { Plus, ArrowUp, Clock, Search, Home, Camera, BarChart3, Users, RotateCcw, Activity } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
@@ -24,6 +24,8 @@ interface ChatPanelProps {
   sendMessageRef: MutableRefObject<((msg: string) => void) | null>;
   onConversationContext?: (ctx: ConversationContext) => void;
   textareaRef?: MutableRefObject<HTMLTextAreaElement | null>;
+  onToggleActivity?: () => void;
+  showActivity?: boolean;
 }
 
 const TypingIndicator = ({ status, completedTools, isSlowResponse }: { status: string; completedTools: string[]; isSlowResponse?: boolean }) => (
@@ -102,7 +104,7 @@ function parseSSEBuffer(buffer: string): [{ event: string; data: string }[], str
   return [events, remaining];
 }
 
-const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext, textareaRef: externalTextareaRef }: ChatPanelProps) => {
+const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext, textareaRef: externalTextareaRef, onToggleActivity, showActivity }: ChatPanelProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeConvoId, setActiveConvoId] = useState<string | null>(null);
@@ -610,22 +612,38 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           })()}
         </div>
 
-        {/* New chat — right */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={startNewChat}
-              className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Plus size={16} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs">New chat</TooltipContent>
-        </Tooltip>
+        {/* Right buttons */}
+        <div className="flex items-center gap-2">
+          {onToggleActivity && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onToggleActivity}
+                  className={`flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors ${showActivity ? "text-foreground" : ""}`}
+                >
+                  <Activity size={16} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Activity</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={startNewChat}
+                className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Plus size={16} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">New chat</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6 md:space-y-8" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
+      {/* Messages — centered */}
+      <div className="flex-1 overflow-y-auto px-5 py-5" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
+        <div className="max-w-2xl mx-auto w-full space-y-6 md:space-y-8">
         {messages.length === 0 && !typingStatus && (
           <div className="flex flex-col items-center justify-center h-full gap-6">
             <div className="text-center">
@@ -730,38 +748,43 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         )}
 
         <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Suggestion chips */}
       {!typingStatus && messages.length > 0 && (
-        <SuggestionChips
-          lastToolUsed={lastToolUsed}
-          topic={lastTopic}
-          contextData={chipContext}
-          onSend={sendMessage}
-        />
+        <div className="max-w-2xl mx-auto w-full">
+          <SuggestionChips
+            lastToolUsed={lastToolUsed}
+            topic={lastTopic}
+            contextData={chipContext}
+            onSend={sendMessage}
+          />
+        </div>
       )}
 
       {/* Input */}
       <div className="sticky bottom-0 z-10 bg-background px-5 py-4 border-t border-border">
-        <div className="flex items-end gap-2 rounded-2xl border border-transparent bg-secondary/50 px-5 py-3 transition-all focus-within:border-border focus-within:bg-card shadow-none">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask Caselli Cowork anything..."
-            rows={1}
-            className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none max-h-[120px] min-h-[44px] md:min-h-0"
-          />
-          <button
-            onClick={() => sendMessage(input)}
-            disabled={!input.trim()}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center transition-all duration-200 ${input.trim() ? "text-primary" : "text-muted-foreground"}`}
-            aria-label="Send message"
-          >
-            <ArrowUp size={20} />
-          </button>
+        <div className="max-w-2xl mx-auto w-full">
+          <div className="flex items-end gap-2 rounded-2xl border border-transparent bg-secondary/50 px-5 py-3 transition-all focus-within:border-border focus-within:bg-card shadow-none">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask Caselli Cowork anything..."
+              rows={1}
+              className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none max-h-[120px] min-h-[44px] md:min-h-0"
+            />
+            <button
+              onClick={() => sendMessage(input)}
+              disabled={!input.trim()}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center transition-all duration-200 ${input.trim() ? "text-primary" : "text-muted-foreground"}`}
+              aria-label="Send message"
+            >
+              <ArrowUp size={20} />
+            </button>
+          </div>
         </div>
       </div>
     </>

@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { Activity, X } from "lucide-react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import ActivityPanel from "@/components/chat/ActivityPanel";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface ConversationContext {
   lastToolUsed?: string;
@@ -12,27 +14,24 @@ export interface ConversationContext {
 }
 
 const Chat = () => {
-  const [activeTab, setActiveTab] = useState<"chat" | "activity">("chat");
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const sendMessageRef = useRef<((msg: string) => void) | null>(null);
   const [conversationContext, setConversationContext] = useState<ConversationContext>({ topic: "general" });
   const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [showActivity, setShowActivity] = useState(false);
 
   useEffect(() => {
     const prompt = searchParams.get("prompt");
-    if (prompt) {
-      setPendingPrompt(prompt);
-    }
+    if (prompt) setPendingPrompt(prompt);
   }, [searchParams]);
 
-  // Cmd+K / Ctrl+K to focus chat input
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setActiveTab("chat");
         chatTextareaRef.current?.focus();
       }
     };
@@ -41,7 +40,7 @@ const Chat = () => {
   }, []);
 
   const handleQuickAction = useCallback((message: string) => {
-    setActiveTab("chat");
+    setShowActivity(false);
     if (sendMessageRef.current) {
       sendMessageRef.current(message);
     } else {
@@ -50,54 +49,65 @@ const Chat = () => {
   }, []);
 
   return (
-    <div className="flex h-full flex-col md:flex-row">
-      {/* Mobile tab toggle */}
-      <div className="flex md:hidden border-b border-border">
-        <button
-          onClick={() => setActiveTab("chat")}
-          className={`flex-1 py-3 text-sm font-medium transition-colors ${
-            activeTab === "chat"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground"
-          }`}
-        >
-          Chat
-        </button>
-        <button
-          onClick={() => setActiveTab("activity")}
-          className={`flex-1 py-3 text-sm font-medium transition-colors ${
-            activeTab === "activity"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground"
-          }`}
-        >
-          Activity
-        </button>
-      </div>
+    <div className="relative flex h-full flex-col">
+      {/* Full-width chat panel */}
+      <ChatPanel
+        pendingPrompt={pendingPrompt}
+        onPromptConsumed={() => setPendingPrompt(null)}
+        sendMessageRef={sendMessageRef}
+        onConversationContext={setConversationContext}
+        textareaRef={chatTextareaRef}
+        onToggleActivity={() => setShowActivity((p) => !p)}
+        showActivity={showActivity}
+      />
 
-      {/* Chat panel */}
-      <div
-        className={`flex-1 flex flex-col md:w-[58%] md:max-w-[58%] min-h-0 ${
-          activeTab !== "chat" ? "hidden md:flex" : "flex"
-        }`}
-      >
-        <ChatPanel
-          pendingPrompt={pendingPrompt}
-          onPromptConsumed={() => setPendingPrompt(null)}
-          sendMessageRef={sendMessageRef}
-          onConversationContext={setConversationContext}
-          textareaRef={chatTextareaRef}
-        />
-      </div>
+      {/* Floating activity overlay */}
+      {showActivity && (
+        <>
+          {/* Backdrop on mobile */}
+          {isMobile && (
+            <div
+              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
+              onClick={() => setShowActivity(false)}
+            />
+          )}
+          <div
+            className={`
+              fixed z-50
+              ${isMobile
+                ? "inset-x-3 bottom-3 top-auto max-h-[75vh] rounded-2xl"
+                : "right-4 top-16 bottom-auto w-[340px] max-h-[calc(100vh-5rem)] rounded-2xl"
+              }
+              border border-border bg-card/95 backdrop-blur-xl shadow-2xl
+              flex flex-col overflow-hidden
+              animate-in fade-in slide-in-from-right-3 duration-200
+            `}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Activity size={14} className="text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">Activity</span>
+              </div>
+              <button
+                onClick={() => setShowActivity(false)}
+                className="flex items-center justify-center h-7 w-7 rounded-lg hover:bg-secondary/70 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
 
-      {/* Activity panel */}
-      <div
-        className={`md:w-[42%] md:max-w-[42%] border-l border-border flex flex-col min-h-0 ${
-          activeTab !== "activity" ? "hidden md:flex" : "flex"
-        }`}
-      >
-        <ActivityPanel onQuickAction={handleQuickAction} conversationContext={conversationContext} />
-      </div>
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto">
+              <ActivityPanel
+                onQuickAction={handleQuickAction}
+                conversationContext={conversationContext}
+                isFloating
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
