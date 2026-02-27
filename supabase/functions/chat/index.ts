@@ -815,14 +815,18 @@ Before using draft_social_post, draft_email, or draft_listing_description for a 
 If the user insists after the warning, proceed with the draft.
 
 TASK TRACKING:
-- For requests with 3+ steps, create a task list using create_todos FIRST before doing anything else.
+- ONLY create a task list for genuinely complex multi-step requests (5+ steps involving different tools).
+- Do NOT create todos for simple requests like "draft a social post" or "update this deal" — just do it.
+- Simple flows like: look up deal → draft content → suggest next steps do NOT need task tracking.
+- Examples that DO need todos: "Set up everything for my new listing" (create deal + add contact + draft social post + draft email + check deadlines).
+- Examples that do NOT need todos: "Draft an open house post for 123 Main St" (just look up the deal and draft it).
 - Update each task to "in_progress" when you start it and "completed" when you finish.
 - Keep only ONE task as "in_progress" at a time.
-- The user sees this task list updating in real-time. It builds trust and transparency.
 
 MULTI-ACTION BEHAVIOR:
 - When a user request involves multiple related actions, execute them all in sequence using your tools.
-- Example: "Add a new listing at 123 Oak Ave for buyer Mike Torres, list price 450k" should trigger: create_todos first, then create_deal, then search_contacts for Mike Torres, then add_contact if not found, then offer to draft a social post.
+- Example: "Add a new listing at 123 Oak Ave for buyer Mike Torres, list price 450k" should trigger: create_deal, then search_contacts for Mike Torres, then add_contact if not found. Suggest drafting marketing materials as a follow-up but don't create them unless asked.
+- For simple requests like "draft a post for my listing", just call get_active_deals or get_deal_details and draft_social_post. Two tool calls, done. No todos needed.
 - You have up to 5 tool calls per message. Use them.
 - After completing a chain of actions, summarize everything you did in a clear list.
 
@@ -954,7 +958,7 @@ FILE CREATION:
           let lastCreatedContactId: string | null = null;
           let todos: { content: string; active_form: string; status: "pending" | "in_progress" | "completed" }[] = [];
 
-          while (iterations < 5) {
+          while (iterations < 3) {
             iterations++;
 
             // Retry logic for Anthropic API
