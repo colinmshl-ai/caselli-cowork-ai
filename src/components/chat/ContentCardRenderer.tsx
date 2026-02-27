@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import SocialPostCard from "./SocialPostCard";
 import EmailCard from "./EmailCard";
 import ListingCard from "./ListingCard";
@@ -7,7 +8,7 @@ import ConversationalRenderer from "./ConversationalRenderer";
 import { Separator } from "@/components/ui/separator";
 
 const PROSE_CLASSES =
-  "prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-1 prose-ul:pl-4 prose-headings:my-2 prose-strong:text-foreground prose-a:text-primary text-foreground";
+  "prose prose-sm max-w-none prose-p:my-2 prose-p:leading-relaxed [&>p]:mb-3 prose-ul:my-2 prose-li:my-1 prose-li:leading-relaxed prose-ul:pl-4 prose-headings:my-2 prose-strong:text-foreground prose-a:text-primary text-foreground";
 
 type ContentTypeHint = "social_post" | "email" | "listing_description" | "conversational" | string;
 
@@ -258,7 +259,7 @@ function renderSection(
         <>
           {intro && (
             <div className={PROSE_CLASSES}>
-              <ReactMarkdown>{intro}</ReactMarkdown>
+               <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
             </div>
           )}
           <EmailCard to={to} subject={subject} body={body} onAction={onAction} contentType={contentType} />
@@ -271,7 +272,7 @@ function renderSection(
         <>
           {intro && (
             <div className={PROSE_CLASSES}>
-              <ReactMarkdown>{intro}</ReactMarkdown>
+               <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
             </div>
           )}
           <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
@@ -284,7 +285,7 @@ function renderSection(
         <>
           {intro && (
             <div className={PROSE_CLASSES}>
-              <ReactMarkdown>{intro}</ReactMarkdown>
+               <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
             </div>
           )}
           <ListingCard address={address} stats={stats} description={description} onAction={onAction} contentType={contentType} />
@@ -309,7 +310,7 @@ function renderSection(
       <>
         {intro && (
           <div className={PROSE_CLASSES}>
-              <ReactMarkdown>{intro}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
             </div>
         )}
         <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
@@ -323,7 +324,7 @@ function renderSection(
       <>
         {intro && (
           <div className={PROSE_CLASSES}>
-              <ReactMarkdown>{intro}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
             </div>
         )}
         <EmailCard to={to} subject={subject} body={body} onAction={onAction} contentType={contentType} />
@@ -337,7 +338,7 @@ function renderSection(
       <>
         {intro && (
           <div className={PROSE_CLASSES}>
-              <ReactMarkdown>{intro}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
             </div>
         )}
         <DealSummaryCard intro={intro} deals={deals} deadlines={deadlines} />
@@ -351,7 +352,7 @@ function renderSection(
       <>
         {intro && (
           <div className={PROSE_CLASSES}>
-              <ReactMarkdown>{intro}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
             </div>
         )}
         <ListingCard address={address} stats={stats} description={description} onAction={onAction} contentType={contentType} />
@@ -362,7 +363,7 @@ function renderSection(
   // Plain markdown
   return (
     <div className={PROSE_CLASSES}>
-      <ReactMarkdown>{section}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkBreaks]}>{section}</ReactMarkdown>
     </div>
   );
 }

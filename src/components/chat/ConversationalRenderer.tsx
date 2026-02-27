@@ -1,9 +1,10 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import { CheckCircle } from "lucide-react";
 
 const PROSE_CLASSES =
-  "prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-1 prose-ul:pl-4 prose-headings:my-2 prose-strong:text-foreground prose-a:text-primary text-foreground";
+  "prose prose-sm max-w-none prose-p:my-2 prose-p:leading-relaxed [&>p]:mb-3 prose-ul:my-2 prose-li:my-1 prose-li:leading-relaxed prose-ul:pl-4 prose-headings:my-2 prose-strong:text-foreground prose-a:text-primary text-foreground";
 
 interface ConversationalRendererProps {
   content: string;
@@ -150,7 +151,7 @@ const ConversationalRenderer = React.forwardRef<HTMLDivElement, ConversationalRe
   if (segments.length === 0) {
     return (
       <div className={PROSE_CLASSES}>
-        <ReactMarkdown>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkBreaks]}>{content}</ReactMarkdown>
       </div>
     );
   }
@@ -164,7 +165,7 @@ const ConversationalRenderer = React.forwardRef<HTMLDivElement, ConversationalRe
           case "markdown":
             return (
               <div key={i} className={PROSE_CLASSES}>
-                <ReactMarkdown>{seg.content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkBreaks]}>{seg.content}</ReactMarkdown>
               </div>
             );
           case "suggestions":
