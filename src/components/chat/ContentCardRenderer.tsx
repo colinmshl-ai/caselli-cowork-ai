@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 interface ContentCardRendererProps {
   content: string;
   onAction?: (message: string) => void;
+  contentType?: "drafted" | "informational";
 }
 
 function detectEmail(content: string) {
@@ -17,10 +18,11 @@ function detectEmail(content: string) {
 }
 
 function detectSocial(content: string) {
-  const hasPlatform = /\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b/i.test(content);
-  const hasDraft = /draft|post|caption|here'?s/i.test(content);
+  const lines = content.split("\n").slice(0, 3).join("\n");
+  const hasPlatformInHeader = /\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b/i.test(lines);
   const hasHashtags = /#\w+/.test(content);
-  return (hasPlatform && hasDraft) || (hasPlatform && hasHashtags);
+  const isConversational = /next steps|I'd suggest|want me to|shall we|^\d+\.\s/im.test(content);
+  return hasPlatformInHeader && hasHashtags && !isConversational;
 }
 
 function detectListing(content: string) {
@@ -138,7 +140,7 @@ function splitSections(content: string): string[] {
   return result.length > 0 ? result : [content];
 }
 
-function renderSection(section: string, onAction?: (message: string) => void) {
+function renderSection(section: string, onAction?: (message: string) => void, contentType?: "drafted" | "informational") {
   if (detectEmail(section)) {
     const { intro, to, subject, body } = parseEmail(section);
     return (
@@ -148,7 +150,7 @@ function renderSection(section: string, onAction?: (message: string) => void) {
             <ReactMarkdown>{intro}</ReactMarkdown>
           </div>
         )}
-        <EmailCard to={to} subject={subject} body={body} onAction={onAction} />
+        <EmailCard to={to} subject={subject} body={body} onAction={onAction} contentType={contentType} />
       </>
     );
   }
@@ -162,7 +164,7 @@ function renderSection(section: string, onAction?: (message: string) => void) {
             <ReactMarkdown>{intro}</ReactMarkdown>
           </div>
         )}
-        <SocialPostCard platform={platform} content={postContent} onAction={onAction} />
+        <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
       </>
     );
   }
@@ -176,7 +178,7 @@ function renderSection(section: string, onAction?: (message: string) => void) {
             <ReactMarkdown>{intro}</ReactMarkdown>
           </div>
         )}
-        <ListingCard address={address} stats={stats} description={description} onAction={onAction} />
+        <ListingCard address={address} stats={stats} description={description} onAction={onAction} contentType={contentType} />
       </>
     );
   }
@@ -189,11 +191,11 @@ function renderSection(section: string, onAction?: (message: string) => void) {
   );
 }
 
-const ContentCardRenderer = ({ content, onAction }: ContentCardRendererProps) => {
+const ContentCardRenderer = ({ content, onAction, contentType }: ContentCardRendererProps) => {
   const sections = splitSections(content);
 
   if (sections.length === 1) {
-    return <>{renderSection(sections[0], onAction)}</>;
+    return <>{renderSection(sections[0], onAction, contentType)}</>;
   }
 
   return (
@@ -205,7 +207,7 @@ const ContentCardRenderer = ({ content, onAction }: ContentCardRendererProps) =>
           style={{ animationDelay: `${i * 100}ms` }}
         >
           {i > 0 && <Separator className="my-3" />}
-          {renderSection(section, onAction)}
+          {renderSection(section, onAction, contentType)}
         </div>
       ))}
     </div>
