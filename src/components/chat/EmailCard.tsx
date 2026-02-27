@@ -1,4 +1,4 @@
-import { Send, Save } from "lucide-react";
+import { Send, Save, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import CopyButton from "./CopyButton";
@@ -15,12 +15,19 @@ interface EmailCardProps {
 const EmailCard = ({ to, subject, body, onAction, contentType }: EmailCardProps) => {
   const wordCount = body.trim().split(/\s+/).filter(Boolean).length;
   const charCount = body.length;
+  const hasEmail = to.includes("@");
 
   return (
     <div className="border border-border border-l-4 border-l-blue-400 rounded-xl overflow-hidden bg-card mt-3 animate-fade-in-up">
       <div className="px-4 py-3 border-b border-border space-y-1.5">
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
           To: <span className={to ? "text-foreground" : "text-muted-foreground italic"}>{to || "Recipient"}</span>
+          {to && !hasEmail && (
+            <span className="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+              <AlertCircle size={12} />
+              <span>No email on file</span>
+            </span>
+          )}
         </div>
         <div className="text-sm font-medium text-foreground">{subject}</div>
       </div>
@@ -37,11 +44,12 @@ const EmailCard = ({ to, subject, body, onAction, contentType }: EmailCardProps)
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-              onClick={() => toast.info("Coming soon — connect Gmail in Settings")}
+              className={`h-8 px-2 text-[11px] ${hasEmail ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/50 cursor-not-allowed"}`}
+              onClick={() => hasEmail ? toast.info("Coming soon — connect Gmail in Settings") : undefined}
+              disabled={!hasEmail}
             >
               <Send size={11} className="mr-1" />
-              Send
+              {hasEmail ? "Send" : "Add email to send"}
             </Button>
             <Button
               variant="ghost"
