@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Search, Upload } from "lucide-react";
+import { Search, Upload, Users } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import ContactSlideOver from "@/components/contacts/ContactSlideOver";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -191,10 +191,11 @@ const Contacts = () => {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Users size={48} className="text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">{search || filter !== "all" ? "No matching contacts" : "No contacts yet"}</p>
             {!search && filter === "all" && (
-              <button onClick={openNew} className="mt-2 text-sm font-medium text-primary hover:opacity-70 transition-opacity">
+              <button onClick={openNew} className="text-sm font-medium text-primary hover:opacity-70 transition-opacity">
                 Add your first contact
               </button>
             )}
