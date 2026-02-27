@@ -1,36 +1,57 @@
 
 
-## Problem
+## Fix: Choppy Text Streaming
 
-The screenshot shows AI responses rendering as a wall of text with no spacing between bold items. The root cause: **ReactMarkdown follows standard CommonMark spec where single `\n` is treated as whitespace, not a line break.** AI models (Claude included) output single newlines between items, expecting them to render as separate lines. Without double newlines or list markers, everything collapses into one paragraph.
+### Changes
 
-Apps like ChatGPT, Vercel's AI SDK chat, and Claude.ai all solve this the same way — they either use `breaks: true` on their markdown renderer (which converts `\n` → `<br/>`) or use Vercel's `streamdown` library (purpose-built for AI streaming markdown).
+**1. `src/components/chat/ChatPanel.tsx` (~lines 346-378)**
 
-## Fix
+- Remove `updateScheduled` flag, `scheduleUpdate` function, and the `requestAnimationFrame` call
+- Replace with direct state update in the `text_delta` handler:
+```tsx
+case "text_delta": {
+  const parsed = JSON.parse(evt.data);
+  if (!firstDeltaReceived) {
+    firstDeltaReceived = true;
+    setTypingStatus("");
+  }
+  streamingContentRef.current += parsed.text;
+  const currentContent = streamingContentRef.current;
+  setMessages((prev) =>
+    prev.map((m) => (m.id === placeholderId ? { ...m, content: currentContent } : m))
+  );
+  break;
+}
+```
 
-### 1. Enable `breaks` on all ReactMarkdown instances
+**2. `src/components/chat/StreamingText.tsx`**
 
-Add the `remarkBreaks` plugin (from `remark-breaks`) to convert single newlines into `<br/>` elements. This is the standard approach used by ChatGPT-like interfaces. Apply to:
+- During streaming, render the already-parsed prefix as markdown and the trailing ~200 chars as raw text to avoid re-parsing full markdown on every delta
+- Use a split approach: markdown-render everything except the last line, render the last line as plain `<span>` with `whitespace-pre-wrap`
+- Place the blinking cursor inline after the last character instead of as a separate block element
+- Wrap the markdown portion in `useMemo` keyed on a stable prefix (content minus last partial line)
 
-- **`ContentCardRenderer.tsx`** — the plain markdown fallback
-- **`StreamingText.tsx`** — the streaming renderer  
-- **`ConversationalRenderer.tsx`** — the markdown segments
+```tsx
+const StreamingText = React.memo(({ content }: StreamingTextProps) => {
+  const lastNewline = content.lastIndexOf('\n');
+  const stablePrefix = lastNewline > 0 ? content.slice(0, lastNewline) : '';
+  const tailLine = lastNewline > 0 ? content.slice(lastNewline + 1) : content;
 
-### 2. Install `remark-breaks`
+  const renderedPrefix = useMemo(() => (
+    stablePrefix ? <ReactMarkdown remarkPlugins={[remarkBreaks]}>{stablePrefix}</ReactMarkdown> : null
+  ), [stablePrefix]);
 
-Add the `remark-breaks` package which provides a remark plugin for `react-markdown`.
+  return (
+    <div className={PROSE_CLASSES}>
+      {renderedPrefix}
+      <span style={{ whiteSpace: 'pre-wrap' }}>{tailLine}</span>
+      <span className="inline w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
+    </div>
+  );
+});
+```
 
-### 3. Improve prose spacing CSS
-
-Update the `PROSE_CLASSES` across all three files to add better paragraph and line spacing:
-- Add `prose-p:leading-relaxed` for better line height
-- Add `[&>p]:mb-3` for explicit paragraph bottom margin
-- Add `prose-li:leading-relaxed` for list item readability
-
-### Files to modify
-
-- **`src/components/chat/ContentCardRenderer.tsx`** — Add `remarkBreaks` to the plain markdown `<ReactMarkdown>` calls, update prose classes
-- **`src/components/chat/StreamingText.tsx`** — Add `remarkBreaks`, update prose classes
-- **`src/components/chat/ConversationalRenderer.tsx`** — Add `remarkBreaks` to markdown segments, update prose classes
-- **`package.json`** — Add `remark-breaks` dependency
+### Files
+- `src/components/chat/ChatPanel.tsx` — Remove RAF batching, use direct `setMessages`
+- `src/components/chat/StreamingText.tsx` — Split render: markdown prefix + raw tail + inline cursor
 
