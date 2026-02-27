@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 
@@ -9,12 +9,27 @@ interface StreamingTextProps {
   content: string;
 }
 
-const StreamingText = React.memo(({ content }: StreamingTextProps) => (
-  <div className={PROSE_CLASSES}>
-    <ReactMarkdown remarkPlugins={[remarkBreaks]}>{content}</ReactMarkdown>
-    <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
-  </div>
-));
+const StreamingText = React.memo(({ content }: StreamingTextProps) => {
+  const lastNewline = content.lastIndexOf('\n');
+  const stablePrefix = lastNewline > 0 ? content.slice(0, lastNewline) : '';
+  const tailLine = lastNewline > 0 ? content.slice(lastNewline + 1) : content;
+
+  const renderedPrefix = useMemo(
+    () =>
+      stablePrefix ? (
+        <ReactMarkdown remarkPlugins={[remarkBreaks]}>{stablePrefix}</ReactMarkdown>
+      ) : null,
+    [stablePrefix]
+  );
+
+  return (
+    <div className={PROSE_CLASSES}>
+      {renderedPrefix}
+      <span style={{ whiteSpace: 'pre-wrap' }}>{tailLine}</span>
+      <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
+    </div>
+  );
+});
 
 StreamingText.displayName = "StreamingText";
 
