@@ -18,19 +18,14 @@ interface ContentCardRendererProps {
   contentTypeHint?: ContentTypeHint;
 }
 
-/** Returns true if the content is clearly conversational — skip all card detection */
+/** Returns true if the content is clearly conversational with confirmations or suggestion structure */
 function detectConversational(content: string): boolean {
-  const trimmed = content.trimStart();
-  // Starts with question words or conversational openers
-  if (/^(What|How|Would|Do you|I'd|Here's|Let me|Sure|Absolutely|Great|Of course|Happy to|I can|I'll|That's|Yes|No,)/i.test(trimmed)) {
+  // Has ✅ confirmation banners — strong signal
+  if (/✅/.test(content)) {
     return true;
   }
-  // Contains conversational phrases
-  if (/here's what|I'd recommend|let me know|want me to|shall we|I can help|would you like/i.test(content)) {
-    return true;
-  }
-  // Contains numbered next-steps list
-  if (/\n\d+\.\s/.test(content)) {
+  // Has a tight "next steps" / "suggestions" header followed by a list
+  if (/(?:next\s+steps|suggestion|would you like me to|want me to)\s*.*:/i.test(content) && /\n\s*[-•*\d]/.test(content)) {
     return true;
   }
   return false;

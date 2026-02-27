@@ -36,10 +36,10 @@ function parseConversational(content: string): Segment[] {
       continue;
     }
 
-    // Detect suggestion header
+    // Detect suggestion header — only match lines clearly offering next-step suggestions
     if (
       !inSuggestions &&
-      /(?:suggest|recommend|here(?:'s| are| is)|next steps|you (?:could|can|might)|ideas?|options?)\s*:/i.test(trimmed)
+      /(?:next\s+steps|suggestion|would you like me to|want me to|I can also)\s*.*:/i.test(trimmed)
     ) {
       // Flush markdown before suggestions
       if (markdownLines.length > 0) {
