@@ -162,7 +162,7 @@ async function executeTool(
       return {
         result: data || [],
         taskType: "deal_lookup",
-        taskDescription: "Looked up active deals",
+        taskDescription: `Reviewed ${(data || []).length} active deal${(data || []).length === 1 ? "" : "s"}`,
       };
     }
     case "get_deal_details": {
@@ -175,7 +175,7 @@ async function executeTool(
       return {
         result: data || { error: "Deal not found" },
         taskType: "deal_lookup",
-        taskDescription: `Looked up deal details for ${data?.property_address || toolInput.deal_id}`,
+        taskDescription: data?.property_address ? `Reviewed deal at ${data.property_address}` : "Looked up deal details",
       };
     }
     case "update_deal": {
@@ -218,10 +218,30 @@ async function executeTool(
         };
       }
 
+      // Build human-friendly update description
+      const fieldLabels: Record<string, string> = {
+        stage: data?.stage ? `stage to ${(data.stage as string).replace(/_/g, " ")}` : "stage",
+        contract_price: data?.contract_price ? `price to $${Number(data.contract_price).toLocaleString()}` : "contract price",
+        list_price: data?.list_price ? `list price to $${Number(data.list_price).toLocaleString()}` : "list price",
+        closing_date: "closing date",
+        inspection_deadline: "inspection deadline",
+        financing_deadline: "financing deadline",
+        appraisal_deadline: "appraisal deadline",
+        client_name: "client info",
+        client_email: "client email",
+        client_phone: "client phone",
+        notes: "notes",
+        deal_type: "deal type",
+      };
+      const changedFields = Object.keys(cleanUpdates)
+        .filter(k => k !== "updated_at")
+        .map(k => fieldLabels[k] || k);
+      const address = data?.property_address || "deal";
+      const changesSummary = changedFields.length > 0 ? ` — ${changedFields.join(", ")}` : "";
       return {
         result: error ? { error: error.message } : data,
         taskType: "deal_update",
-        taskDescription: `Updated deal ${data?.property_address || deal_id}: ${Object.keys(cleanUpdates).filter(k => k !== "updated_at").join(", ")}`,
+        taskDescription: `Updated ${address}${changesSummary}`,
       };
     }
     case "check_upcoming_deadlines": {
@@ -253,7 +273,7 @@ async function executeTool(
       return {
         result: deadlines,
         taskType: "deadline_check",
-        taskDescription: `Checked upcoming deadlines — ${deadlines.length} found`,
+        taskDescription: deadlines.length === 0 ? "Checked deadlines — all clear" : `Found ${deadlines.length} upcoming deadline${deadlines.length === 1 ? "" : "s"}`,
       };
     }
     case "create_deal": {
@@ -272,10 +292,11 @@ async function executeTool(
         .insert(dealData)
         .select()
         .single();
+      const price = toolInput.list_price ? ` at $${Number(toolInput.list_price).toLocaleString()}` : "";
       return {
         result: error ? { error: error.message } : data,
         taskType: "deal_create",
-        taskDescription: `Created new deal: ${toolInput.property_address}`,
+        taskDescription: `New deal added: ${toolInput.property_address}${price}`,
       };
     }
     case "draft_social_post":
@@ -291,10 +312,21 @@ async function executeTool(
           .single();
         if (deal) context.deal = deal;
       }
+      // Build human-friendly content description
+      const contentLabels: Record<string, string> = {
+        draft_social_post: "social post",
+        draft_email: "email",
+        draft_listing_description: "listing description",
+      };
+      const contentLabel = contentLabels[toolName] || toolName.replace("draft_", "");
+      const dealAddress = (context.deal as Record<string, unknown>)?.property_address as string | undefined;
+      const qualifier = toolInput.platform || toolInput.post_type || toolInput.style || toolInput.email_type || "";
+      const forDeal = dealAddress ? ` for ${dealAddress}` : "";
+      const qualifierStr = qualifier ? ` (${qualifier})` : "";
       return {
         result: context,
         taskType: "content_drafted",
-        taskDescription: `Drafted ${toolName.replace("draft_", "")}: ${toolInput.post_type || toolInput.style || toolInput.email_type || ""}`.trim(),
+        taskDescription: `Drafted ${contentLabel}${forDeal}${qualifierStr}`,
       };
     }
     case "search_contacts": {
@@ -304,10 +336,13 @@ async function executeTool(
         .select("*")
         .eq("user_id", userId)
         .or(`full_name.ilike.${q},email.ilike.${q},company.ilike.${q}`);
+      const matchCount = (data || []).length;
       return {
         result: data || [],
         taskType: "contact_lookup",
-        taskDescription: `Searched contacts for "${toolInput.query}"`,
+        taskDescription: matchCount > 0
+          ? `Found ${matchCount} contact${matchCount === 1 ? "" : "s"} matching "${toolInput.query}"`
+          : `No contacts found for "${toolInput.query}"`,
       };
     }
     case "add_contact": {
@@ -329,10 +364,11 @@ async function executeTool(
         .select()
         .single();
       if (error) console.error("add_contact failed:", error.message, { toolInput });
+      const contactType = (toolInput.contact_type as string) || "client";
       return {
         result: error ? { error: error.message, success: false } : { ...data, success: true },
-        taskType: "contact_updated",
-        taskDescription: error ? `Failed to add contact: ${error.message}` : `Added contact: ${toolInput.full_name}`,
+        taskType: "contact_added",
+        taskDescription: error ? `Failed to add contact` : `Added new ${contactType}: ${toolInput.full_name}`,
       };
     }
     case "update_contact": {
@@ -348,10 +384,12 @@ async function executeTool(
         .eq("user_id", userId)
         .select()
         .single();
+      const contactName = data?.full_name || "contact";
+      const updatedFields = Object.keys(cleanUpdates).join(", ");
       return {
         result: error ? { error: error.message } : data,
         taskType: "contact_updated",
-        taskDescription: `Updated contact: ${data?.full_name || contact_id}`,
+        taskDescription: error ? `Failed to update ${contactName}` : `Updated ${contactName}'s ${updatedFields}`,
       };
     }
     default:
