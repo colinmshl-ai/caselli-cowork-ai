@@ -553,16 +553,16 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between relative z-10">
         {/* History button — left */}
         <Sheet open={showConvos} onOpenChange={(open) => { setShowConvos(open); if (!open) setConvoSearch(""); }}>
-          <SheetTrigger asChild>
-            <Tooltip>
-              <TooltipTrigger asChild>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <SheetTrigger asChild>
                 <button className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
                   <Clock size={16} />
                 </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">History</TooltipContent>
-            </Tooltip>
-          </SheetTrigger>
+              </SheetTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">History</TooltipContent>
+          </Tooltip>
           <SheetContent side="left" className="w-72 p-0">
             <SheetHeader className="px-4 pt-4 pb-3 border-b border-border">
               <SheetTitle className="text-sm font-semibold">Conversations</SheetTitle>
