@@ -343,19 +343,6 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         let contentTypeFromDone: string | undefined;
         let undoActionsFromDone: any[] | undefined;
         let errorSeen = false;
-        let updateScheduled = false;
-
-        const scheduleUpdate = () => {
-          if (updateScheduled) return;
-          updateScheduled = true;
-          requestAnimationFrame(() => {
-            updateScheduled = false;
-            const content = streamingContentRef.current;
-            setMessages((prev) =>
-              prev.map((m) => (m.id === placeholderId ? { ...m, content } : m))
-            );
-          });
-        };
 
         while (true) {
           const { done, value } = await reader.read();
@@ -374,7 +361,10 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                   setTypingStatus("");
                 }
                 streamingContentRef.current += parsed.text;
-                scheduleUpdate();
+                const currentContent = streamingContentRef.current;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === placeholderId ? { ...m, content: currentContent } : m))
+                );
                 break;
               }
               case "tool_status": {
