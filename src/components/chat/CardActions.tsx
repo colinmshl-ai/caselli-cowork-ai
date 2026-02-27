@@ -19,7 +19,7 @@ const CardActions = ({ contentType, onAction }: CardActionsProps) => (
     <Button
       variant="ghost"
       size="sm"
-      className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+      className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
       onClick={() => onAction(`Regenerate this ${contentType}`)}
     >
       <RefreshCw size={11} className="mr-1" />
@@ -30,7 +30,7 @@ const CardActions = ({ contentType, onAction }: CardActionsProps) => (
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+          className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
         >
           <Palette size={11} className="mr-1" />
           Adjust tone

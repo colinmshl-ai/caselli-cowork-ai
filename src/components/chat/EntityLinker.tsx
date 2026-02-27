@@ -17,7 +17,7 @@ const EntityLinker = ({ dealId, contactId, children }: EntityLinkerProps) => {
         {dealId && (
           <Link
             to={`/deals?highlight=${dealId}`}
-            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-accent text-accent-foreground hover:bg-accent/80 transition-colors"
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-accent text-accent-foreground hover:bg-accent/80 transition-colors"
           >
             <Home size={12} />
             View deal
@@ -26,7 +26,7 @@ const EntityLinker = ({ dealId, contactId, children }: EntityLinkerProps) => {
         {contactId && (
           <Link
             to={`/contacts?highlight=${contactId}`}
-            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-accent text-accent-foreground hover:bg-accent/80 transition-colors"
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-accent text-accent-foreground hover:bg-accent/80 transition-colors"
           >
             <User size={12} />
             View contact

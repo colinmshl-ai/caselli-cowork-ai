@@ -33,7 +33,7 @@ interface DealSlideOverProps {
 }
 
 const inputClass =
-  "w-full rounded-md border border-border bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground";
+  "w-full rounded-lg border border-border bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-foreground";
 
 function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const dateValue = value ? new Date(value + "T00:00:00") : undefined;
@@ -192,13 +192,13 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
           <div className="flex gap-2 px-5 py-3 border-b border-border">
             <button
               onClick={() => quickAction(`Draft a follow-up email to ${deal.client_name || "my client"} about the property at ${deal.property_address}`)}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
             >
               <Mail size={12} /> Draft email
             </button>
             <button
               onClick={() => quickAction(`Create a social media post for the listing at ${deal.property_address}`)}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
             >
               <Share2 size={12} /> Social post
             </button>
@@ -229,7 +229,7 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
           {/* Deal type toggle */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Deal type</label>
-            <div className="flex rounded-md border border-border overflow-hidden">
+            <div className="flex rounded-lg border border-border overflow-hidden">
               {(["buyer", "seller"] as const).map((t) => (
                 <button
                   key={t}
@@ -286,7 +286,7 @@ const DealSlideOver = ({ open, deal, onClose, onSaved, onDelete }: DealSlideOver
 
           {/* Actions */}
           <div className="flex items-center gap-4 pt-2">
-            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-md bg-primary min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-lg bg-primary min-h-[44px] py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
               {saving ? "Saving…" : "Save"}
             </button>
             <button onClick={onClose} className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground transition-colors">

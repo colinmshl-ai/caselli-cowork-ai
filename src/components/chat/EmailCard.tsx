@@ -16,7 +16,7 @@ const EmailCard = ({ to, subject, body, onAction }: EmailCardProps) => {
   const charCount = body.length;
 
   return (
-    <div className="border border-border border-l-4 border-l-blue-400 rounded-md overflow-hidden bg-card mt-3 animate-fade-in-up">
+    <div className="border border-border border-l-4 border-l-blue-400 rounded-xl overflow-hidden bg-card mt-3 animate-fade-in-up">
       <div className="px-4 py-3 border-b border-border space-y-1.5">
         <div className="text-xs text-muted-foreground">
           To: <span className={to ? "text-foreground" : "text-muted-foreground italic"}>{to || "Recipient"}</span>
@@ -35,7 +35,7 @@ const EmailCard = ({ to, subject, body, onAction }: EmailCardProps) => {
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+            className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={() => toast.info("Coming soon — connect Gmail in Settings")}
           >
             <Send size={11} className="mr-1" />
@@ -44,7 +44,7 @@ const EmailCard = ({ to, subject, body, onAction }: EmailCardProps) => {
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+            className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={() => toast.success("Draft saved")}
           >
             <Save size={11} className="mr-1" />
