@@ -13,3 +13,5 @@ project_id = "cmqldzpqfkxpvnntmtcp"
     verify_jwt = false
   [functions.stripe-webhook]
     verify_jwt = false
+  [functions.undo-action]
+    verify_jwt = false

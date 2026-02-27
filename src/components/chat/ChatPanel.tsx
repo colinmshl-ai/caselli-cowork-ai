@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import ContentCardRenderer from "./ContentCardRenderer";
+import UndoButton from "./UndoButton";
 
 import EntityLinker from "./EntityLinker";
 import SuggestionChips from "./SuggestionChips";
@@ -337,6 +338,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         let lastDealIdFromDone: string | undefined;
         let lastContactIdFromDone: string | undefined;
         let contentTypeFromDone: string | undefined;
+        let undoActionsFromDone: any[] | undefined;
         let errorSeen = false;
         let updateScheduled = false;
 
@@ -390,6 +392,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 lastContactIdFromDone = parsed.last_contact_id || undefined;
                 // Capture content_type from done event
                 contentTypeFromDone = parsed.content_type || undefined;
+                undoActionsFromDone = parsed.undo_actions || undefined;
                 // Capture chip context
                 if (parsed.chip_context) {
                   setChipContext(parsed.chip_context as ChipContext);
@@ -429,7 +432,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           lastContactId: lastContactIdFromDone,
         };
         setMessages((prev) =>
-          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, toolsUsed, contentTypeHint: contentTypeFromDone, ...entityIds } : m))
+          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, toolsUsed, contentTypeHint: contentTypeFromDone, undoActions: undoActionsFromDone, ...entityIds } : m))
         );
 
         // Fetch the saved message from DB to get the real ID
@@ -443,7 +446,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         if (latestMessages?.[0]) {
           setMessages((prev) =>
-            prev.map((m) => (m.id === placeholderId ? { ...latestMessages[0], toolsUsed, contentTypeHint: contentTypeFromDone } : m))
+            prev.map((m) => (m.id === placeholderId ? { ...latestMessages[0], toolsUsed, contentTypeHint: contentTypeFromDone, undoActions: undoActionsFromDone } : m))
           );
         }
 
@@ -675,6 +678,15 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                       contentTypeHint={m.contentTypeHint || (m.metadata as any)?.content_type}
                     />
                   </EntityLinker>
+                  {(m.undoActions || (m.metadata as any)?.undo_actions)?.length > 0 && (
+                    <UndoButton
+                      actions={m.undoActions || (m.metadata as any)?.undo_actions}
+                      onUndoComplete={() => {
+                        queryClient.invalidateQueries({ queryKey: ["activity-deals"] });
+                        queryClient.invalidateQueries({ queryKey: ["activity-tasks"] });
+                      }}
+                    />
+                  )}
                   {m.isError && lastUserMessage && (
                     <button
                       onClick={() => sendMessage(lastUserMessage)}

@@ -145,12 +145,19 @@ const TOOLS = [
   },
 ];
 
+interface UndoAction {
+  type: "delete_deal" | "delete_contact" | "revert_deal";
+  entity_id: string;
+  previous_values?: Record<string, unknown>;
+  label: string;
+}
+
 async function executeTool(
   toolName: string,
   toolInput: Record<string, unknown>,
   userId: string,
   adminClient: ReturnType<typeof createClient>
-): Promise<{ result: unknown; taskType: string; taskDescription: string }> {
+): Promise<{ result: unknown; taskType: string; taskDescription: string; undoAction?: UndoAction }> {
   switch (toolName) {
     case "get_active_deals": {
       const { data } = await adminClient
@@ -199,6 +206,15 @@ async function executeTool(
         };
       }
 
+      // Capture previous values for undo
+      const fieldsToCapture = Object.keys(cleanUpdates).filter(k => k !== "updated_at");
+      const { data: previousDeal } = await adminClient
+        .from("deals")
+        .select(fieldsToCapture.join(", "))
+        .eq("id", deal_id as string)
+        .eq("user_id", userId)
+        .single();
+
       cleanUpdates.updated_at = new Date().toISOString();
       const { data, error } = await adminClient
         .from("deals")
@@ -242,6 +258,12 @@ async function executeTool(
         result: error ? { error: error.message } : data,
         taskType: "deal_update",
         taskDescription: `Updated ${address}${changesSummary}`,
+        undoAction: !error && data ? {
+          type: "revert_deal",
+          entity_id: deal_id as string,
+          previous_values: previousDeal || {},
+          label: `Undo update to ${address}`,
+        } : undefined,
       };
     }
     case "check_upcoming_deadlines": {
@@ -297,6 +319,11 @@ async function executeTool(
         result: error ? { error: error.message } : data,
         taskType: "deal_create",
         taskDescription: `New deal added: ${toolInput.property_address}${price}`,
+        undoAction: !error && data ? {
+          type: "delete_deal" as const,
+          entity_id: (data as any).id,
+          label: `Undo creating ${toolInput.property_address}`,
+        } : undefined,
       };
     }
     case "draft_social_post":
@@ -369,6 +396,11 @@ async function executeTool(
         result: error ? { error: error.message, success: false } : { ...data, success: true },
         taskType: "contact_added",
         taskDescription: error ? `Failed to add contact` : `Added new ${contactType}: ${toolInput.full_name}`,
+        undoAction: !error && data ? {
+          type: "delete_contact" as const,
+          entity_id: (data as any).id,
+          label: `Undo adding ${toolInput.full_name}`,
+        } : undefined,
       };
     }
     case "update_contact": {
@@ -694,6 +726,7 @@ MULTI-ACTION BEHAVIOR:
           let fullText = "";
           const toolsUsed: { tool: string; description: string }[] = [];
           const toolCallLog: { tool: string; input: Record<string, unknown>; result: unknown }[] = [];
+          const undoActions: UndoAction[] = [];
           let currentMessages = [...apiMessages];
           let iterations = 0;
           let lastCreatedDealId: string | null = null;
@@ -807,12 +840,13 @@ MULTI-ACTION BEHAVIOR:
                 toolsUsed.push(toolEntry);
                 sendSSE(controller, "tool_status", { tool: tool.name, status: desc });
 
-                const { result, taskType, taskDescription } = await executeTool(
+                const { result, taskType, taskDescription, undoAction } = await executeTool(
                   tool.name,
                   tool.input,
                   userId,
                   adminClient
                 );
+                if (undoAction) undoActions.push(undoAction);
 
                 toolCallLog.push({ tool: tool.name, input: tool.input, result });
 
@@ -867,6 +901,7 @@ MULTI-ACTION BEHAVIOR:
           // Save assistant message with enriched tool metadata
           const assistantContent = fullText || "I wasn't able to generate a response.";
           const metadata: Record<string, unknown> = { content_type: contentType };
+          if (undoActions.length > 0) metadata.undo_actions = undoActions;
           if (toolCallLog.length > 0) {
             metadata.tools = toolCallLog.map(t => {
               // Create a concise result summary for history context
@@ -958,7 +993,7 @@ MULTI-ACTION BEHAVIOR:
           }
 
           // Send done event
-          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext, content_type: contentType });
+          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext, content_type: contentType, undo_actions: undoActions.length > 0 ? undoActions : undefined });
 
 
           // Background memory extraction (fire and forget)
