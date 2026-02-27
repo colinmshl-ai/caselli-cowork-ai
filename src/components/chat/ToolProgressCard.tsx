@@ -30,7 +30,7 @@ const ToolProgressCard = ({ card }: { card: ToolCard }) => {
 
   useEffect(() => {
     if (card.status === "done") {
-      const t = setTimeout(() => setCollapsed(true), 1500);
+      const t = setTimeout(() => setCollapsed(true), 800);
       return () => clearTimeout(t);
     }
   }, [card.status]);

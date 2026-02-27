@@ -385,6 +385,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
               case "tool_start": {
                 const parsed = JSON.parse(evt.data);
                 setTypingStatus(parsed.status);
+                // Skip tool cards for todo operations - shown in activity panel
+                if (parsed.tool === "create_todos" || parsed.tool === "update_todo") break;
                 const cardId = crypto.randomUUID();
                 setToolCards((prev) => [...prev, { id: cardId, tool: parsed.tool, inputSummary: parsed.input_summary || parsed.status, status: "running" }]);
                 // Store cardId mapped to tool name for lookup on tool_done
@@ -554,7 +556,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       setCompletedTools([]);
       setIsSlowResponse(false);
       // Clear tool cards after a delay so collapsed cards are visible briefly
-      setTimeout(() => setToolCards([]), 3000);
+      setTimeout(() => setToolCards([]), 500);
       if (slowTimerRef.current) { clearTimeout(slowTimerRef.current); slowTimerRef.current = null; }
     }
   }, [activeConvoId, user, queryClient, onConversationContext]);
