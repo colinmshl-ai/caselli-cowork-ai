@@ -393,6 +393,19 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 });
                 break;
               }
+              case "web_search_result": {
+                const parsed = JSON.parse(evt.data);
+                const cardId = crypto.randomUUID();
+                setToolCards((prev) => [...prev, {
+                  id: cardId,
+                  tool: "web_search",
+                  inputSummary: parsed.query ? `Searching: "${parsed.query}"` : "Searching the web...",
+                  status: "done",
+                  resultSummary: `Found ${parsed.results_count || 0} web results`,
+                  success: true,
+                }]);
+                break;
+              }
               case "done": {
                 const parsed = JSON.parse(evt.data);
                 toolsUsed = parsed.tools_used || [];
