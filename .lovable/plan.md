@@ -1,56 +1,39 @@
 
 
-## Layout Redesign: Full-Width Chat with Floating Activity Cards
+## Problem
 
-### Problem
-The chat panel is constrained to 58% width with the activity panel taking 42% as a fixed sidebar. This makes the chat feel cramped and left-aligned.
+During SSE streaming, every text delta triggers a `setMessages` update via `requestAnimationFrame`. Each update causes `ContentCardRenderer` to re-parse the entire content string — running regex detection (social, email, listing, deal summary, conversational) and re-rendering `ReactMarkdown` from scratch. This creates visible jank: layout shifts, flickering card detection mid-stream, and unnecessary component remounts.
 
-### Approach
-- Make the chat panel full-width and centered (max-width ~720px, centered like ChatGPT/Claude)
-- Convert the activity panel into floating overlay cards positioned in the top-right corner
-- Activity cards show stats, briefing, and quick actions as dismissible/collapsible floating elements
-- On mobile, activity becomes a slide-up sheet accessible via a button
+Additionally, the console shows ref warnings because `ContentCardRenderer` passes a ref to `ConversationalRenderer` which is a plain function component.
+
+## Plan
+
+### 1. Show plain streaming text during stream, render rich cards only on completion
+
+In `ChatPanel.tsx`, track an `isStreaming` boolean on the placeholder message. While streaming, render the content as simple markdown only (skip `ContentCardRenderer` entirely). On stream completion (after the `done` event / reader finishes), flip `isStreaming` to false — triggering a single rich render with card detection.
+
+This eliminates hundreds of wasted regex + ReactMarkdown re-renders during streaming.
+
+**Changes in `ChatPanel.tsx`:**
+- Add `isStreaming: true` to the placeholder message object
+- In the message render loop, check `m.isStreaming` — if true, render a lightweight `<ReactMarkdown>` directly instead of `<ContentCardRenderer>`
+- On final content update (after stream ends), set `isStreaming: false`
+
+### 2. Create a lightweight `StreamingText` component
+
+New file `src/components/chat/StreamingText.tsx` — a minimal component that renders markdown with `React.memo` and a stable prose class. No card detection, no regex, no parsing. Just clean text rendering optimized for rapid updates.
+
+### 3. Fix the forwardRef console warning
+
+In `ContentCardRenderer.tsx`, the `ConversationalRenderer` is rendered as a child of `EntityLinker` which may pass refs. Wrap `ConversationalRenderer` with `React.forwardRef` or ensure `EntityLinker` doesn't pass refs to its children.
+
+### 4. Add a smooth content transition on stream completion
+
+When streaming ends and the rich render kicks in, add a subtle CSS `transition` (opacity) so the switch from plain text to styled cards feels deliberate rather than jarring.
 
 ### Files to modify
 
-**`src/pages/Chat.tsx`**
-- Remove the 58/42 split layout
-- Make chat panel `flex-1` full width
-- Remove the activity panel as a sidebar column
-- Add a floating activity overlay container (absolute/fixed positioned top-right)
-- Add a toggle button (Activity icon) in the chat header area to show/hide the floating cards
-
-**`src/components/chat/ActivityPanel.tsx`**
-- Refactor from a full sidebar into a floating card layout
-- Wrap each section (stats grid, briefing, quick actions, recent activity) in individual rounded cards with shadows
-- Add a close/minimize button
-- Use `max-w-[320px]` width, `max-h-[70vh]` with scroll
-- Add backdrop blur/transparency for polish
-
-**`src/components/chat/ChatPanel.tsx`**
-- Center the message area with `max-w-2xl mx-auto` on the messages container and input
-- Remove tight `max-w` constraints on assistant messages since the container handles width
-- Adjust welcome screen to center properly in full width
-
-### Visual result
-```text
-┌──────────────────────────────────────────┐
-│ Nav │        Chat (centered, 720px)       │
-│  C  │  ┌─────────────────────────┐  ┌──┐ │
-│  📧 │  │ Messages...             │  │🃏│ │
-│  📄 │  │                         │  │  │ │
-│  👥 │  │                         │  │Fl│ │
-│  ⚙️ │  │                         │  │oa│ │
-│     │  │                         │  │t │ │
-│     │  ├─────────────────────────┤  └──┘ │
-│     │  │ Input...                │       │
-│     │  └─────────────────────────┘       │
-└──────────────────────────────────────────┘
-```
-
-### Implementation steps
-
-1. **Update `Chat.tsx`** — Remove split layout, make chat full-width, add floating activity container with toggle state and an Activity button in the corner
-2. **Update `ChatPanel.tsx`** — Add `max-w-2xl mx-auto w-full` to message scroll area and input bar so content centers within full width
-3. **Refactor `ActivityPanel.tsx`** — Wrap in a floating card container (`fixed`/`absolute`, right-aligned, rounded-2xl, shadow-lg, border) with a close button header, scrollable content, and max dimensions
+- **`src/components/chat/StreamingText.tsx`** (new) — lightweight memo'd markdown renderer for streaming
+- **`src/components/chat/ChatPanel.tsx`** — add `isStreaming` flag to placeholder, use `StreamingText` during stream, switch to `ContentCardRenderer` on completion
+- **`src/components/chat/ConversationalRenderer.tsx`** — wrap with `forwardRef` to fix console warning
 
