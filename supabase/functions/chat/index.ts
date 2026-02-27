@@ -115,6 +115,7 @@ const TOOLS = [
         property_address: { type: "string" },
         details: { type: "string" },
         platform: { type: "string", enum: ["instagram", "facebook", "linkedin"] },
+        deal_id: { type: "string", description: "The deal UUID from get_active_deals" },
       },
       required: ["post_type"],
     },
@@ -131,6 +132,7 @@ const TOOLS = [
         sqft: { type: "number" },
         features: { type: "string" },
         style: { type: "string", enum: ["mls_short", "mls_full", "marketing"] },
+        deal_id: { type: "string", description: "The deal UUID from get_active_deals" },
       },
       required: ["property_address"],
     },
@@ -423,15 +425,42 @@ async function executeTool(
     case "draft_social_post":
     case "draft_listing_description":
     case "draft_email": {
+      console.log(`[${toolName}] Input:`, JSON.stringify(toolInput));
       let context: Record<string, unknown> = { success: true, ...toolInput };
+      
+      // Try deal_id first, then fall back to address search
       if (toolInput.deal_id) {
         const { data: deal } = await adminClient
           .from("deals")
           .select("*")
           .eq("id", toolInput.deal_id as string)
           .eq("user_id", userId)
-          .single();
-        if (deal) context.deal = deal;
+          .maybeSingle();
+        if (deal) {
+          context.deal = deal;
+          console.log(`[${toolName}] Found deal by ID: ${deal.property_address}`);
+        } else {
+          console.warn(`[${toolName}] deal_id ${toolInput.deal_id} not found`);
+        }
+      } else if (toolInput.property_address) {
+        const { data: deals } = await adminClient
+          .from("deals")
+          .select("*")
+          .eq("user_id", userId)
+          .ilike("property_address", `%${toolInput.property_address}%`)
+          .limit(1);
+        if (deals && deals.length > 0) {
+          context.deal = deals[0];
+          console.log(`[${toolName}] Found deal by address: ${deals[0].property_address}`);
+        } else {
+          console.warn(`[${toolName}] No deal found for address: ${toolInput.property_address}`);
+        }
+      }
+      
+      if (!context.deal) {
+        console.warn(`[${toolName}] No deal data available. Input:`, JSON.stringify(toolInput));
+        context.no_deal_found = true;
+        context.message = "No matching deal found. Draft using available context from the conversation.";
       }
       // Build human-friendly content description
       const contentLabels: Record<string, string> = {
@@ -1174,7 +1203,9 @@ FILE CREATION:
           }
 
           // Save assistant message with enriched tool metadata
-          const assistantContent = fullText || "I wasn't able to generate a response.";
+          const assistantContent = fullText || (toolCallLog.length > 0
+            ? "I ran into an issue generating content. Could you try again or provide more details?"
+            : "I wasn't able to generate a response. Please try again.");
           const metadata: Record<string, unknown> = { content_type: contentType };
           if (undoActions.length > 0) metadata.undo_actions = undoActions;
           if (toolCallLog.length > 0) {
