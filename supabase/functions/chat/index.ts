@@ -120,7 +120,7 @@ const TOOLS = [
         full_name: { type: "string" },
         email: { type: "string" },
         phone: { type: "string" },
-        contact_type: { type: "string" },
+        contact_type: { type: "string", enum: ["client", "lead", "vendor", "agent", "lender", "other"] },
         company: { type: "string" },
         notes: { type: "string" },
       },
@@ -301,15 +301,28 @@ async function executeTool(
       };
     }
     case "add_contact": {
+      if (!toolInput.full_name) {
+        return { result: { error: "Contact name is required" }, taskType: "contact_updated", taskDescription: "Failed to add contact: no name provided" };
+      }
+      const contactData = {
+        user_id: userId,
+        full_name: toolInput.full_name,
+        email: toolInput.email || null,
+        phone: toolInput.phone || null,
+        contact_type: toolInput.contact_type || "client",
+        company: toolInput.company || null,
+        notes: toolInput.notes || null,
+      };
       const { data, error } = await adminClient
         .from("contacts")
-        .insert({ user_id: userId, ...toolInput })
+        .insert(contactData)
         .select()
         .single();
+      if (error) console.error("add_contact failed:", error.message, { toolInput });
       return {
-        result: error ? { error: error.message } : data,
+        result: error ? { error: error.message, success: false } : { ...data, success: true },
         taskType: "contact_updated",
-        taskDescription: `Added contact: ${toolInput.full_name}`,
+        taskDescription: error ? `Failed to add contact: ${error.message}` : `Added contact: ${toolInput.full_name}`,
       };
     }
     case "update_contact": {
