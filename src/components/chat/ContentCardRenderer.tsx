@@ -33,6 +33,8 @@ function detectConversational(content: string): boolean {
 }
 
 function detectEmail(content: string) {
+  // If it also looks like a social post, it's not an email
+  if (detectSocial(content)) return false;
   const hasSubject = /\*?\*?Subject:?\*?\*?\s*(.+)/i.test(content);
   const hasRecipient = /\*?\*?To:?\*?\*?\s*(.+)/i.test(content);
   // Require BOTH Subject and To lines
@@ -310,6 +312,20 @@ function renderSection(
     );
   }
 
+  if (detectSocial(section)) {
+    const { intro, platform, postContent } = parseSocial(section);
+    return (
+      <>
+        {intro && (
+          <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+            <ReactMarkdown>{intro}</ReactMarkdown>
+          </div>
+        )}
+        <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
+      </>
+    );
+  }
+
   if (detectEmail(section)) {
     const { intro, to, subject, body } = parseEmail(section);
     return (
@@ -334,20 +350,6 @@ function renderSection(
           </div>
         )}
         <DealSummaryCard intro={intro} deals={deals} deadlines={deadlines} />
-      </>
-    );
-  }
-
-  if (detectSocial(section)) {
-    const { intro, platform, postContent } = parseSocial(section);
-    return (
-      <>
-        {intro && (
-          <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
-            <ReactMarkdown>{intro}</ReactMarkdown>
-          </div>
-        )}
-        <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
       </>
     );
   }
