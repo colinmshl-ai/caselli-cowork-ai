@@ -478,6 +478,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   search_contacts: "Searching your contacts...",
   add_contact: "Adding a new contact...",
   update_contact: "Updating contact info...",
+  web_search: "Searching the web...",
 };
 
 const encoder = new TextEncoder();
@@ -526,6 +527,15 @@ async function parseAnthropicStream(
             currentToolId = event.content_block.id;
             currentToolName = event.content_block.name;
             currentToolInput = "";
+          } else if (event.content_block?.type === "web_search_tool_result") {
+            // Server-side web search completed — stream results to frontend
+            const searchResults = event.content_block.search_results || [];
+            const sources = searchResults.map((r: { title?: string; url?: string }) => r.title || r.url || "").filter(Boolean).slice(0, 5);
+            sendSSE(controller, "web_search_result", {
+              query: event.content_block.content?.query || "",
+              results_count: searchResults.length,
+              sources,
+            });
           }
           break;
 
@@ -692,8 +702,15 @@ WRITING STYLE RULES:
   - After drafting a social post → suggest creating versions for other platforms, scheduling the post, and drafting a matching email blast
   - After adding a contact → suggest drafting an intro email, linking them to an existing deal, and setting a follow-up reminder
 
+WEB SEARCH:
+- You have access to web search. Use it proactively when the user asks about market data, property values, neighborhood info, comparable sales, news, mortgage rates, or anything that benefits from current data.
+- When you search, cite your sources with URLs so the agent can verify.
+- Combine web search results with your knowledge to give comprehensive answers.
+- For market reports, always search for the latest data rather than relying on training data.
+- If a user shares a property address and asks you to research it, search for it.
+
 YOUR CAPABILITIES AND HOW TO USE THEM:
-- You have tools to manage deals, contacts, and draft content. USE THEM PROACTIVELY.
+- You have tools to manage deals, contacts, draft content, and search the web. USE THEM PROACTIVELY.
 - When the agent mentions a person by name, automatically search contacts to see if they exist before asking.
 - When the agent mentions a property address, check if there is already a deal for it.
 - When creating a deal, also offer to add the client as a contact if they are not already in the system.
@@ -789,7 +806,18 @@ MULTI-ACTION BEHAVIOR:
                   model: "claude-sonnet-4-20250514",
                   system: systemPrompt,
                   messages: currentMessages,
-                  tools: TOOLS,
+                  tools: [
+                    {
+                      type: "web_search_20250305",
+                      name: "web_search",
+                      max_uses: 5,
+                    },
+                    ...TOOLS.map(t => ({
+                      name: t.name,
+                      description: t.description,
+                      input_schema: t.input_schema,
+                    })),
+                  ],
                   max_tokens: 4096,
                   stream: true,
                 }),
@@ -870,6 +898,11 @@ MULTI-ACTION BEHAVIOR:
               // Execute tools and send status events
               const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
               for (const tool of iterationToolCalls) {
+                // Skip server-side tools (web_search is executed by Anthropic)
+                if (tool.name === "web_search") {
+                  toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: "Server-side tool — results already provided." });
+                  continue;
+                }
                 const desc = TOOL_DESCRIPTIONS[tool.name] || "Working on it...";
                 const toolEntry: { tool: string; description: string; deal_id?: string; contact_id?: string } = { tool: tool.name, description: desc };
                 if (tool.input?.deal_id) toolEntry.deal_id = tool.input.deal_id;
