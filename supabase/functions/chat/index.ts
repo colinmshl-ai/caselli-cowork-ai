@@ -6,6 +6,43 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function summarizeToolInput(toolName: string, input: Record<string, unknown>): string {
+  switch (toolName) {
+    case "search_contacts": return `Searching for "${input.query || input.name || "contacts"}"`;
+    case "add_contact": return `Adding contact: ${input.full_name || "new contact"}`;
+    case "update_contact": return `Updating contact`;
+    case "create_deal": return `Creating deal: ${input.property_address || "new deal"}`;
+    case "update_deal": return `Updating deal`;
+    case "get_active_deals": return "Reviewing your pipeline";
+    case "get_deal_details": return "Looking up deal details";
+    case "check_upcoming_deadlines": return "Checking upcoming deadlines";
+    case "draft_email": return `Drafting ${input.email_type || "email"}${input.recipient_name ? ` to ${input.recipient_name}` : ""}`;
+    case "draft_social_post": return `Drafting ${input.post_type || "post"} for ${input.platform || "social"}`;
+    case "draft_listing_description": return `Writing listing description`;
+    default: return "Working...";
+  }
+}
+
+function summarizeToolResult(toolName: string, result: unknown, taskDescription: string): string {
+  if (Array.isArray(result)) {
+    const n = result.length;
+    switch (toolName) {
+      case "search_contacts": return n > 0 ? `Found ${n} contact${n > 1 ? "s" : ""}` : "No contacts found";
+      case "get_active_deals": return `Found ${n} active deal${n > 1 ? "s" : ""}`;
+      case "check_upcoming_deadlines": return n > 0 ? `${n} upcoming deadline${n > 1 ? "s" : ""}` : "No upcoming deadlines";
+      default: return taskDescription || "Done";
+    }
+  }
+  if (result && typeof result === "object" && (result as Record<string, unknown>).id) {
+    switch (toolName) {
+      case "create_deal": return `Deal created: ${(result as Record<string, unknown>).property_address || ""}`;
+      case "add_contact": return `Contact added: ${(result as Record<string, unknown>).full_name || ""}`;
+      default: return taskDescription || "Done";
+    }
+  }
+  return taskDescription || "Done";
+}
+
 const TOOLS = [
   {
     name: "get_active_deals",
@@ -838,7 +875,7 @@ MULTI-ACTION BEHAVIOR:
                 if (tool.input?.deal_id) toolEntry.deal_id = tool.input.deal_id;
                 if (tool.input?.contact_id) toolEntry.contact_id = tool.input.contact_id;
                 toolsUsed.push(toolEntry);
-                sendSSE(controller, "tool_status", { tool: tool.name, status: desc });
+                sendSSE(controller, "tool_start", { tool: tool.name, status: desc, input_summary: summarizeToolInput(tool.name, tool.input) });
 
                 const { result, taskType, taskDescription, undoAction } = await executeTool(
                   tool.name,
@@ -847,6 +884,9 @@ MULTI-ACTION BEHAVIOR:
                   adminClient
                 );
                 if (undoAction) undoActions.push(undoAction);
+
+                // Send tool_done event with result summary
+                sendSSE(controller, "tool_done", { tool: tool.name, result_summary: summarizeToolResult(tool.name, result, taskDescription), success: !result?.error });
 
                 toolCallLog.push({ tool: tool.name, input: tool.input, result });
 

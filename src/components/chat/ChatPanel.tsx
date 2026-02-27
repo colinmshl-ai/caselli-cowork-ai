@@ -9,6 +9,8 @@ import { formatDistanceToNow } from "date-fns";
 import ContentCardRenderer from "./ContentCardRenderer";
 import StreamingText from "./StreamingText";
 import UndoButton from "./UndoButton";
+import ToolProgressCard from "./ToolProgressCard";
+import type { ToolCard } from "./ToolProgressCard";
 
 import EntityLinker from "./EntityLinker";
 import SuggestionChips from "./SuggestionChips";
@@ -127,7 +129,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const [lastTopic, setLastTopic] = useState<string | undefined>();
   const [lastUserMessage, setLastUserMessage] = useState<string>("");
   const [chipContext, setChipContext] = useState<ChipContext>({});
-
+  const [toolCards, setToolCards] = useState<ToolCard[]>([]);
   // Mobile keyboard handling via visualViewport
   useEffect(() => {
     const vv = window.visualViewport;
@@ -343,7 +345,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         let contentTypeFromDone: string | undefined;
         let undoActionsFromDone: any[] | undefined;
         let errorSeen = false;
-
+        const toolCardMap: Record<string, string> = {};
+        setToolCards([]);
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -367,13 +370,26 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 );
                 break;
               }
-              case "tool_status": {
+              case "tool_start": {
                 const parsed = JSON.parse(evt.data);
+                setTypingStatus(parsed.status);
+                const cardId = crypto.randomUUID();
+                setToolCards((prev) => [...prev, { id: cardId, tool: parsed.tool, inputSummary: parsed.input_summary || parsed.status, status: "running" }]);
+                // Store cardId mapped to tool name for lookup on tool_done
+                toolCardMap[parsed.tool] = cardId;
+                break;
+              }
+              case "tool_done": {
+                const parsed = JSON.parse(evt.data);
+                const cardId = toolCardMap[parsed.tool];
+                if (cardId) {
+                  setToolCards((prev) => prev.map((c) => c.id === cardId ? { ...c, status: "done", resultSummary: parsed.result_summary, success: parsed.success } : c));
+                }
                 setTypingStatus((prev) => {
                   if (prev && prev !== "Thinking...") {
                     setCompletedTools((ct) => [...ct, prev.replace("...", " - done")]);
                   }
-                  return parsed.status;
+                  return "";
                 });
                 break;
               }
@@ -489,6 +505,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       setTypingStatus("");
       setCompletedTools([]);
       setIsSlowResponse(false);
+      // Clear tool cards after a delay so collapsed cards are visible briefly
+      setTimeout(() => setToolCards([]), 3000);
       if (slowTimerRef.current) { clearTimeout(slowTimerRef.current); slowTimerRef.current = null; }
     }
   }, [activeConvoId, user, queryClient, onConversationContext]);
@@ -740,7 +758,16 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           </div>
         )}
 
-        {(typingStatus || completedTools.length > 0) && (
+        {/* Inline tool progress cards */}
+        {toolCards.length > 0 && (
+          <div className="space-y-2 animate-fade-in">
+            {toolCards.map((card) => (
+              <ToolProgressCard key={card.id} card={card} />
+            ))}
+          </div>
+        )}
+
+        {(typingStatus || completedTools.length > 0) && !toolCards.some(c => c.status === "running") && (
           <TypingIndicator status={typingStatus} completedTools={completedTools} isSlowResponse={isSlowResponse} />
         )}
 
