@@ -180,6 +180,39 @@ const TOOLS = [
       required: ["contact_id"],
     },
   },
+  {
+    name: "create_todos",
+    description: "Create a task list to track progress on a multi-step request. Use this when the user asks for something that requires 3+ steps. Each item should describe a concrete action you will take.",
+    input_schema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              content: { type: "string", description: "What needs to be done" },
+              active_form: { type: "string", description: "Present tense version shown during execution, e.g. 'Searching for market data'" },
+            },
+            required: ["content", "active_form"],
+          },
+        },
+      },
+      required: ["items"],
+    },
+  },
+  {
+    name: "update_todo",
+    description: "Update a task's status. Mark as in_progress when starting it, completed when done. Only one task should be in_progress at a time.",
+    input_schema: {
+      type: "object",
+      properties: {
+        index: { type: "number", description: "Zero-based index of the task to update" },
+        status: { type: "string", enum: ["in_progress", "completed"] },
+      },
+      required: ["index", "status"],
+    },
+  },
 ];
 
 interface UndoAction {
@@ -461,6 +494,10 @@ async function executeTool(
         taskDescription: error ? `Failed to update ${contactName}` : `Updated ${contactName}'s ${updatedFields}`,
       };
     }
+    case "create_todos":
+    case "update_todo":
+      // Handled inline in the agentic loop, not here
+      return { result: { success: true }, taskType: "todo", taskDescription: "Task list updated" };
     default:
       return { result: { error: "Unknown tool" }, taskType: "unknown", taskDescription: "Unknown tool called" };
   }
@@ -479,6 +516,8 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   add_contact: "Adding a new contact...",
   update_contact: "Updating contact info...",
   web_search: "Searching the web...",
+  create_todos: "Setting up task list...",
+  update_todo: "Updating task...",
 };
 
 const encoder = new TextEncoder();
@@ -743,9 +782,15 @@ Before using draft_social_post, draft_email, or draft_listing_description for a 
 - Do not draft listing descriptions for properties that are closed or fell through
 If the user insists after the warning, proceed with the draft.
 
+TASK TRACKING:
+- For requests with 3+ steps, create a task list using create_todos FIRST before doing anything else.
+- Update each task to "in_progress" when you start it and "completed" when you finish.
+- Keep only ONE task as "in_progress" at a time.
+- The user sees this task list updating in real-time. It builds trust and transparency.
+
 MULTI-ACTION BEHAVIOR:
 - When a user request involves multiple related actions, execute them all in sequence using your tools.
-- Example: "Add a new listing at 123 Oak Ave for buyer Mike Torres, list price 450k" should trigger: create_deal, then search_contacts for Mike Torres, then add_contact if not found, then offer to draft a social post.
+- Example: "Add a new listing at 123 Oak Ave for buyer Mike Torres, list price 450k" should trigger: create_todos first, then create_deal, then search_contacts for Mike Torres, then add_contact if not found, then offer to draft a social post.
 - You have up to 5 tool calls per message. Use them.
 - After completing a chain of actions, summarize everything you did in a clear list.`;
 
@@ -785,6 +830,7 @@ MULTI-ACTION BEHAVIOR:
           let iterations = 0;
           let lastCreatedDealId: string | null = null;
           let lastCreatedContactId: string | null = null;
+          let todos: { content: string; active_form: string; status: "pending" | "in_progress" | "completed" }[] = [];
 
           while (iterations < 5) {
             iterations++;
@@ -897,8 +943,26 @@ MULTI-ACTION BEHAVIOR:
 
               // Execute tools — parallel when safe, sequential as fallback
               const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
-              const customTools = iterationToolCalls.filter(t => t.name !== "web_search");
+              const customTools = iterationToolCalls.filter(t => t.name !== "web_search" && t.name !== "create_todos" && t.name !== "update_todo");
               const webSearchTools = iterationToolCalls.filter(t => t.name === "web_search");
+              const todoTools = iterationToolCalls.filter(t => t.name === "create_todos" || t.name === "update_todo");
+
+              // Handle todo tools immediately (no DB, just in-memory + SSE)
+              for (const tool of todoTools) {
+                if (tool.name === "create_todos") {
+                  const items = (tool.input.items as { content: string; active_form: string }[]) || [];
+                  todos = items.map(item => ({ content: item.content, active_form: item.active_form, status: "pending" as const }));
+                  sendSSE(controller, "todo_update", { todos: todos.map((t, i) => ({ ...t, index: i })) });
+                } else if (tool.name === "update_todo") {
+                  const idx = tool.input.index as number;
+                  const status = tool.input.status as "in_progress" | "completed";
+                  if (todos[idx]) {
+                    todos[idx].status = status;
+                    sendSSE(controller, "todo_update", { todos: todos.map((t, i) => ({ ...t, index: i })) });
+                  }
+                }
+                toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: JSON.stringify({ success: true }) });
+              }
 
               // Add web_search results immediately
               for (const ws of webSearchTools) {

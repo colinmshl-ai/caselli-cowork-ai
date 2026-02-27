@@ -21,6 +21,13 @@ const DEAL_TOOLS = ["get_active_deals", "get_deal_details", "update_deal", "chec
 const CONTENT_TOOLS = ["draft_social_post", "draft_listing_description", "draft_email"];
 const CONTACT_TOOLS = ["search_contacts", "add_contact", "update_contact"];
 
+export interface TodoItem {
+  index: number;
+  content: string;
+  active_form: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
 interface ChatPanelProps {
   pendingPrompt: string | null;
   onPromptConsumed: () => void;
@@ -29,6 +36,7 @@ interface ChatPanelProps {
   textareaRef?: MutableRefObject<HTMLTextAreaElement | null>;
   onToggleActivity?: () => void;
   showActivity?: boolean;
+  onTodosUpdate?: (todos: TodoItem[]) => void;
 }
 
 const TypingIndicator = ({ status, completedTools, isSlowResponse }: { status: string; completedTools: string[]; isSlowResponse?: boolean }) => (
@@ -107,7 +115,7 @@ function parseSSEBuffer(buffer: string): [{ event: string; data: string }[], str
   return [events, remaining];
 }
 
-const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext, textareaRef: externalTextareaRef, onToggleActivity, showActivity }: ChatPanelProps) => {
+const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext, textareaRef: externalTextareaRef, onToggleActivity, showActivity, onTodosUpdate }: ChatPanelProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeConvoId, setActiveConvoId] = useState<string | null>(null);
@@ -404,6 +412,15 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                   resultSummary: `Found ${parsed.results_count || 0} web results`,
                   success: true,
                 }]);
+                break;
+              }
+              case "todo_update": {
+                const parsed = JSON.parse(evt.data);
+                onTodosUpdate?.(parsed.todos || []);
+                // Auto-open activity panel when todos appear
+                if ((parsed.todos || []).length > 0 && !showActivity) {
+                  onToggleActivity?.();
+                }
                 break;
               }
               case "done": {
