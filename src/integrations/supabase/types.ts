@@ -158,6 +158,8 @@ export type Database = {
       deals: {
         Row: {
           appraisal_deadline: string | null
+          bathrooms: number | null
+          bedrooms: number | null
           client_email: string | null
           client_name: string | null
           client_phone: string | null
@@ -165,18 +167,28 @@ export type Database = {
           contract_price: number | null
           created_at: string
           deal_type: string | null
+          enrichment_data: Json | null
           financing_deadline: string | null
           id: string
           inspection_deadline: string | null
+          last_sale_date: string | null
+          last_sale_price: number | null
           list_price: number | null
+          lot_size: number | null
           notes: string | null
           property_address: string
+          property_photos: string[] | null
+          property_type: string | null
+          square_footage: number | null
           stage: string
           updated_at: string
           user_id: string
+          year_built: number | null
         }
         Insert: {
           appraisal_deadline?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
           client_email?: string | null
           client_name?: string | null
           client_phone?: string | null
@@ -184,18 +196,28 @@ export type Database = {
           contract_price?: number | null
           created_at?: string
           deal_type?: string | null
+          enrichment_data?: Json | null
           financing_deadline?: string | null
           id?: string
           inspection_deadline?: string | null
+          last_sale_date?: string | null
+          last_sale_price?: number | null
           list_price?: number | null
+          lot_size?: number | null
           notes?: string | null
           property_address: string
+          property_photos?: string[] | null
+          property_type?: string | null
+          square_footage?: number | null
           stage?: string
           updated_at?: string
           user_id: string
+          year_built?: number | null
         }
         Update: {
           appraisal_deadline?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
           client_email?: string | null
           client_name?: string | null
           client_phone?: string | null
@@ -203,15 +225,23 @@ export type Database = {
           contract_price?: number | null
           created_at?: string
           deal_type?: string | null
+          enrichment_data?: Json | null
           financing_deadline?: string | null
           id?: string
           inspection_deadline?: string | null
+          last_sale_date?: string | null
+          last_sale_price?: number | null
           list_price?: number | null
+          lot_size?: number | null
           notes?: string | null
           property_address?: string
+          property_photos?: string[] | null
+          property_type?: string | null
+          square_footage?: number | null
           stage?: string
           updated_at?: string
           user_id?: string
+          year_built?: number | null
         }
         Relationships: [
           {
