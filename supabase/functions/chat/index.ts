@@ -184,6 +184,21 @@ async function executeTool(
       for (const [k, v] of Object.entries(updates)) {
         if (v !== undefined && v !== null) cleanUpdates[k] = v;
       }
+
+      // Coerce numeric fields
+      if (cleanUpdates.contract_price) cleanUpdates.contract_price = Number(cleanUpdates.contract_price);
+      if (cleanUpdates.list_price) cleanUpdates.list_price = Number(cleanUpdates.list_price);
+
+      // Validate stage
+      const VALID_STAGES = ["lead", "active", "under_contract", "due_diligence", "clear_to_close", "closed", "fell_through"];
+      if (cleanUpdates.stage && !VALID_STAGES.includes(cleanUpdates.stage as string)) {
+        return {
+          result: { error: `Invalid stage: ${cleanUpdates.stage}. Valid values: ${VALID_STAGES.join(", ")}` },
+          taskType: "deal_update",
+          taskDescription: `Failed to update deal: invalid stage`,
+        };
+      }
+
       cleanUpdates.updated_at = new Date().toISOString();
       const { data, error } = await adminClient
         .from("deals")
@@ -192,6 +207,17 @@ async function executeTool(
         .eq("user_id", userId)
         .select()
         .single();
+
+      if (error) console.error("update_deal failed:", error.message, { deal_id, cleanUpdates });
+
+      if (!data && !error) {
+        return {
+          result: { error: "Deal not found or no changes applied" },
+          taskType: "deal_update",
+          taskDescription: `Failed to update deal ${deal_id}`,
+        };
+      }
+
       return {
         result: error ? { error: error.message } : data,
         taskType: "deal_update",
