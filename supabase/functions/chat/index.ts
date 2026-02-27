@@ -59,7 +59,7 @@ const TOOLS = [
   },
   {
     name: "draft_social_post",
-    description: "Draft a social media post. Default to Instagram unless the agent specifies otherwise. ALWAYS include 5-8 relevant hashtags. Include emojis appropriate to the platform. Types: new_listing, just_sold, open_house, market_update, tip, testimonial. Match the agent's brand voice exactly. After drafting, ask: Want me to adjust anything or adapt this for another platform?",
+    description: "Draft a social media post. Before drafting, verify the deal stage matches the post type. New listing and open house posts should only be for active listings. Just sold posts should only be for closed deals. Default to Instagram unless the agent specifies otherwise. ALWAYS include 5-8 relevant hashtags. Include emojis appropriate to the platform. Types: new_listing, just_sold, open_house, market_update, tip, testimonial. Match the agent's brand voice exactly. After drafting, ask: Want me to adjust anything or adapt this for another platform?",
     input_schema: {
       type: "object",
       properties: {
@@ -585,6 +585,13 @@ RULES:
 - Use your tools proactively. Do not wait to be explicitly asked if the context makes it obvious.
 - After every response, think: "What would a great assistant do next?" and suggest it.
 - Never give one-word or minimal answers. Always add value.
+
+IMPORTANT - Pre-action validation:
+Before using draft_social_post, draft_email, or draft_listing_description for a specific property, FIRST check the deal's current stage using get_deal_details or your conversation memory. If the action conflicts with the stage, warn the user BEFORE drafting:
+- Do not draft "new listing" or "open house" posts for properties that are under contract, pending, or closed
+- Do not draft "just sold" posts for properties that are not in the "closed" stage
+- Do not draft listing descriptions for properties that are closed or fell through
+If the user insists after the warning, proceed with the draft.
 
 MULTI-ACTION BEHAVIOR:
 - When a user request involves multiple related actions, execute them all in sequence using your tools.
