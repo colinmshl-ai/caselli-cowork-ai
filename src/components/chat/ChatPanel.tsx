@@ -42,32 +42,21 @@ interface ChatPanelProps {
   onTodosUpdate?: (todos: TodoItem[]) => void;
 }
 
-const TypingIndicator = ({ status, completedTools, isSlowResponse }: { status: string; completedTools: string[]; isSlowResponse?: boolean }) => (
+const TypingIndicator = ({ status, isSlowResponse }: { status: string; isSlowResponse?: boolean }) => (
   <div className="flex flex-col gap-1.5 py-2">
-    <div className="flex flex-wrap gap-1.5">
-      {completedTools.map((tool, i) => (
-        <span
-          key={i}
-          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-accent/10 text-accent-foreground animate-fade-in"
-        >
-          <span className="text-primary">✓</span>
-          {tool}
+    {status && (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="flex gap-0.5">
+          <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "0ms" }} />
+          <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "200ms" }} />
+          <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "400ms" }} />
         </span>
-      ))}
-      {status && (
-        <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-[11px] font-medium bg-primary/10 text-primary">
-          <span className="flex gap-0.5">
-            <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "0ms" }} />
-            <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "200ms" }} />
-            <span className="h-1 w-1 rounded-full bg-primary animate-typing-dot" style={{ animationDelay: "400ms" }} />
-          </span>
-          {status}
-        </span>
-      )}
-    </div>
+        {status}
+      </span>
+    )}
     {isSlowResponse && (
       <span className="text-[11px] text-muted-foreground animate-fade-in">
-        This is taking longer than usual…
+        This is taking longer than usual...
       </span>
     )}
   </div>
@@ -132,7 +121,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   const textareaRef = externalTextareaRef || internalTextareaRef;
   const initialized = useRef(false);
   const welcomeSent = useRef(false);
-  const [completedTools, setCompletedTools] = useState<string[]>([]);
+  
   const [isSlowResponse, setIsSlowResponse] = useState(false);
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -399,12 +388,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 if (cardId) {
                   setToolCards((prev) => prev.map((c) => c.id === cardId ? { ...c, status: "done", resultSummary: parsed.result_summary, success: parsed.success } : c));
                 }
-                setTypingStatus((prev) => {
-                  if (prev && prev !== "Thinking...") {
-                    setCompletedTools((ct) => [...ct, prev.replace("...", " - done")]);
-                  }
-                  return "";
-                });
+                setTypingStatus("");
+
                 break;
               }
               case "web_search_result": {
@@ -553,7 +538,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: "Something went wrong. Please try again." }]);
     } finally {
       setTypingStatus("");
-      setCompletedTools([]);
+      
       setIsSlowResponse(false);
       // Clear tool cards after a delay so collapsed cards are visible briefly
       setTimeout(() => setToolCards([]), 500);
@@ -819,15 +804,15 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         {/* Inline tool progress cards */}
         {toolCards.length > 0 && (
-          <div className="space-y-2 animate-fade-in">
+          <div className="flex flex-wrap gap-1.5 animate-fade-in">
             {toolCards.map((card) => (
               <ToolProgressCard key={card.id} card={card} />
             ))}
           </div>
         )}
 
-        {(typingStatus || completedTools.length > 0) && !toolCards.some(c => c.status === "running") && (
-          <TypingIndicator status={typingStatus} completedTools={completedTools} isSlowResponse={isSlowResponse} />
+        {typingStatus && !toolCards.some(c => c.status === "running") && (
+          <TypingIndicator status={typingStatus} isSlowResponse={isSlowResponse} />
         )}
 
         <div ref={messagesEndRef} />

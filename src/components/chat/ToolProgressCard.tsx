@@ -40,10 +40,10 @@ const ToolProgressCard = ({ card }: { card: ToolCard }) => {
 
   if (collapsed) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/60 px-3 py-1.5 text-xs text-muted-foreground animate-fade-in transition-all duration-300">
-        <Check size={12} className="text-primary shrink-0" />
-        <span className="truncate">{card.resultSummary || card.inputSummary}</span>
-      </div>
+      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-secondary/50 text-muted-foreground">
+        <Check size={10} className="text-primary" />
+        {card.resultSummary || card.inputSummary}
+      </span>
     );
   }
 
