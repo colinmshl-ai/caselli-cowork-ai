@@ -723,50 +723,11 @@ Deno.serve(async (req) => {
     const recentActivity = recentActivityRes.data || [];
     const lastConvo = lastConvoRes.data?.[0];
 
-    // Build system prompt
-    let systemPrompt = `You are Caselli, a sharp, proactive real estate AI coworker. You anticipate needs, not just respond to requests. When an agent mentions a listing, you automatically think about what marketing materials they'll need, what deadlines to track, and who to notify. You speak in the agent's chosen brand tone at all times.\n\n`;
+    // === SYSTEM PROMPT: Split into static (cacheable) + profile (cacheable) + dynamic (not cached) ===
 
-    if (profile) {
-      const fields: [string, string | null | undefined][] = [
-        ["Business Name", profile.business_name],
-        ["Brokerage", profile.brokerage_name],
-        ["Market Area", profile.market_area],
-        ["Specialties", profile.specialties?.join(", ")],
-        ["Team Size", profile.team_size],
-        ["Brand Voice", profile.brand_tone],
-        ["Brand Voice Sample", profile.brand_voice_notes],
-        ["Preferred Title Company", profile.preferred_title_company],
-        ["Preferred Inspector", profile.preferred_inspector],
-        ["Preferred Photographer", profile.preferred_photographer],
-        ["Preferred Lender", profile.preferred_lender],
-      ];
-      const agentLines = fields.filter(([, v]) => v && v.trim()).map(([l, v]) => `${l}: ${v}`);
-      if (agentLines.length > 0) {
-        systemPrompt += `ABOUT THE AGENT YOU WORK WITH:\n${agentLines.join("\n")}\n\n`;
-      }
-    }
+    const STATIC_SYSTEM_PROMPT = `You are Caselli, a sharp, proactive real estate AI coworker. You anticipate needs, not just respond to requests. When an agent mentions a listing, you automatically think about what marketing materials they'll need, what deadlines to track, and who to notify. You speak in the agent's chosen brand tone at all times.
 
-    if (memoryFacts.length > 0) {
-      systemPrompt += `THINGS I REMEMBER FROM PAST CONVERSATIONS:\n${memoryFacts.map((m) => `- ${m.fact}`).join("\n")}\n\n`;
-    }
-
-    // Add recent activity context for cross-conversation continuity
-    if (recentActivity.length > 0) {
-      systemPrompt += `RECENT ACTIVITY (last actions across all conversations):\n`;
-      for (const activity of recentActivity) {
-        const meta = activity.metadata as Record<string, unknown> | null;
-        const toolName = meta?.tool || activity.task_type;
-        const inputSummary = meta?.input ? Object.entries(meta.input as Record<string, unknown>).filter(([, v]) => v).map(([k, v]) => `${k}="${v}"`).join(", ") : "";
-        systemPrompt += `- ${activity.description || toolName}${inputSummary ? ` (${inputSummary})` : ""}\n`;
-      }
-      systemPrompt += `\n`;
-    }
-
-    if (lastConvo && lastConvo.id !== conversation_id && lastConvo.title) {
-      systemPrompt += `LAST CONVERSATION CONTEXT: The user's most recent conversation was titled "${lastConvo.title}". Reference this naturally if relevant.\n\n`;
-    }
-
-    systemPrompt += `YOUR PERSONALITY AND BEHAVIOR:
+YOUR PERSONALITY AND BEHAVIOR:
 - You are a sharp, proactive coworker, not a chatbot. Think two steps ahead.
 - After completing ANY task, always suggest 1-2 logical next steps without being asked.
 - When you create a deal, immediately offer: "Want me to draft a welcome email to the client?" or "Should I check if we have their contact info on file?"
@@ -854,6 +815,88 @@ FILE CREATION:
 - Use HTML for formatted content that needs styling.
 - Always mention the filename when you create a file.`;
 
+    // Build profile context block (cacheable — changes rarely)
+    let profileContext = "";
+    if (profile) {
+      const fields: [string, string | null | undefined][] = [
+        ["Business Name", profile.business_name],
+        ["Brokerage", profile.brokerage_name],
+        ["Market Area", profile.market_area],
+        ["Specialties", profile.specialties?.join(", ")],
+        ["Team Size", profile.team_size],
+        ["Brand Voice", profile.brand_tone],
+        ["Brand Voice Sample", profile.brand_voice_notes],
+        ["Preferred Title Company", profile.preferred_title_company],
+        ["Preferred Inspector", profile.preferred_inspector],
+        ["Preferred Photographer", profile.preferred_photographer],
+        ["Preferred Lender", profile.preferred_lender],
+      ];
+      const agentLines = fields.filter(([, v]) => v && v.trim()).map(([l, v]) => `${l}: ${v}`);
+      if (agentLines.length > 0) {
+        profileContext = `ABOUT THE AGENT YOU WORK WITH:\n${agentLines.join("\n")}`;
+      }
+    }
+
+    // Build dynamic context block (changes every request — NOT cached)
+    let dynamicContext = "";
+    if (memoryFacts.length > 0) {
+      dynamicContext += `THINGS I REMEMBER FROM PAST CONVERSATIONS:\n${memoryFacts.map((m) => `- ${m.fact}`).join("\n")}\n\n`;
+    }
+    if (recentActivity.length > 0) {
+      dynamicContext += `RECENT ACTIVITY (last actions across all conversations):\n`;
+      for (const activity of recentActivity) {
+        const meta = activity.metadata as Record<string, unknown> | null;
+        const toolName = meta?.tool || activity.task_type;
+        const inputSummary = meta?.input ? Object.entries(meta.input as Record<string, unknown>).filter(([, v]) => v).map(([k, v]) => `${k}="${v}"`).join(", ") : "";
+        dynamicContext += `- ${activity.description || toolName}${inputSummary ? ` (${inputSummary})` : ""}\n`;
+      }
+      dynamicContext += `\n`;
+    }
+    if (lastConvo && lastConvo.id !== conversation_id && lastConvo.title) {
+      dynamicContext += `LAST CONVERSATION CONTEXT: The user's most recent conversation was titled "${lastConvo.title}". Reference this naturally if relevant.\n\n`;
+    }
+
+    // Structure system prompt as array of content blocks for prompt caching
+    const systemContent: { type: string; text: string; cache_control?: { type: string } }[] = [
+      {
+        type: "text",
+        text: STATIC_SYSTEM_PROMPT,
+        cache_control: { type: "ephemeral" },
+      },
+    ];
+    if (profileContext) {
+      systemContent.push({
+        type: "text",
+        text: profileContext,
+        cache_control: { type: "ephemeral" },
+      });
+    }
+    if (dynamicContext) {
+      systemContent.push({
+        type: "text",
+        text: dynamicContext,
+      });
+    }
+
+    // Build tools array with cache_control on the last tool
+    const toolDefs = TOOLS.map(t => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.input_schema,
+    }));
+    const toolsWithCache = [
+      {
+        type: "web_search_20250305",
+        name: "web_search",
+        max_uses: 5,
+      },
+      ...toolDefs.slice(0, -1),
+      {
+        ...toolDefs[toolDefs.length - 1],
+        cache_control: { type: "ephemeral" },
+      },
+    ];
+
     const apiMessages = [
       ...history.map((m: { role: string; content: string; metadata?: { tools?: { tool: string; input: Record<string, unknown>; result_summary?: string }[] } }) => {
         let content = m.content;
@@ -910,20 +953,9 @@ FILE CREATION:
                 },
                 body: JSON.stringify({
                   model: "claude-sonnet-4-20250514",
-                  system: systemPrompt,
+                  system: systemContent,
                   messages: currentMessages,
-                  tools: [
-                    {
-                      type: "web_search_20250305",
-                      name: "web_search",
-                      max_uses: 5,
-                    },
-                    ...TOOLS.map(t => ({
-                      name: t.name,
-                      description: t.description,
-                      input_schema: t.input_schema,
-                    })),
-                  ],
+                  tools: toolsWithCache,
                   max_tokens: 4096,
                   stream: true,
                 }),
