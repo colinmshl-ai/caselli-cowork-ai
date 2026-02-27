@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { formatDistanceToNow, startOfDay, endOfWeek, startOfWeek, format } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { Home, FileText, UserPlus, RefreshCw, Clock, Activity, Search, Mail, ChevronRight } from "lucide-react";
 import type { ConversationContext } from "@/pages/Chat";
 
@@ -59,9 +59,6 @@ interface ActivityPanelProps {
 const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProps) => {
   const { user } = useAuth();
   const now = new Date();
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-  const todayStart = startOfDay(now);
   const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const displayName = user?.user_metadata?.full_name?.split(" ")[0] || "there";
@@ -147,23 +144,69 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
     enabled: !!conversationContext.lastContactId && topic === "contacts",
   });
 
-  const activeDeals = deals.filter((d) => !["closed", "fell_through"].includes(d.stage)).length;
-  const deadlinesThisWeek = deals.filter((d) => {
-    const dates = [d.closing_date, d.inspection_deadline, d.financing_deadline, d.appraisal_deadline].filter(Boolean);
-    return dates.some((dt) => {
-      const date = new Date(dt);
+  const activeDealsList = deals.filter((d) => !["closed", "fell_through"].includes(d.stage));
+  const activeDeals = activeDealsList.length;
+  const upcomingDeadlines = deals.flatMap((d) => {
+    return [
+      { label: "Inspection", date: d.inspection_deadline, address: d.property_address },
+      { label: "Financing", date: d.financing_deadline, address: d.property_address },
+      { label: "Appraisal", date: d.appraisal_deadline, address: d.property_address },
+      { label: "Closing", date: d.closing_date, address: d.property_address },
+    ].filter((dl) => {
+      if (!dl.date) return false;
+      const date = new Date(dl.date);
       return date >= now && date <= sevenDaysOut;
     });
+  });
+  const deadlinesThisWeek = upcomingDeadlines.length;
+
+  // Actionable items: deals needing follow-up (no activity in 7 days) + approaching deadlines (next 3 days)
+  const threeDaysOut = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const urgentDeadlines = upcomingDeadlines.filter((dl) => new Date(dl.date!) <= threeDaysOut).length;
+  const dealsNeedingFollowUp = activeDealsList.filter((d) => {
+    const updated = new Date(d.updated_at);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return updated < sevenDaysAgo;
   }).length;
-  const tasksToday = taskHistory.filter((t) => new Date(t.created_at) >= todayStart).length;
+  const actionItems = urgentDeadlines + dealsNeedingFollowUp;
+
   const newLeads = recentLeadContacts.length;
 
   const stats = [
     { label: "Active Deals", value: activeDeals },
     { label: "Deadlines This Week", value: deadlinesThisWeek },
-    { label: "Tasks Today", value: tasksToday },
+    { label: "Action Items", value: actionItems },
     { label: "New Leads", value: newLeads },
   ];
+
+  // Generate briefing summary text
+  const generateBriefingSummary = () => {
+    if (activeDeals === 0) return null;
+    const parts: string[] = [];
+    // Mention top deal
+    const topDeal = activeDealsList[0];
+    if (topDeal) {
+      const price = topDeal.contract_price || topDeal.list_price;
+      const priceStr = price ? ` at $${(price / 1000).toFixed(0)}k` : "";
+      const stageStr = topDeal.stage.replace("_", " ");
+      parts.push(`Your ${topDeal.property_address.split(",")[0]} deal is ${stageStr}${priceStr}.`);
+    }
+    // Deadlines
+    if (deadlinesThisWeek === 0) {
+      parts.push("No deadlines this week.");
+    } else {
+      const next = upcomingDeadlines.sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())[0];
+      parts.push(`Next deadline: ${next.label} for ${next.address.split(",")[0]} on ${format(new Date(next.date!), "MMM d")}.`);
+    }
+    // Follow-ups
+    if (dealsNeedingFollowUp > 0) {
+      parts.push(`${dealsNeedingFollowUp} deal${dealsNeedingFollowUp > 1 ? "s" : ""} need${dealsNeedingFollowUp === 1 ? "s" : ""} follow-up.`);
+    }
+    return parts.join(" ");
+  };
+
+  const briefingSummary = generateBriefingSummary();
+  const hasNoData = activeDeals === 0 && newLeads === 0;
 
   const getNextDeadline = (deal: typeof focusedDeal) => {
     if (!deal) return null;
@@ -205,14 +248,44 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
 
         <div key={topic} className="mt-6 transition-opacity duration-200 animate-in fade-in">
           {topic === "general" && (
-            <div className="grid grid-cols-2 gap-3">
-              {stats.map((s) => (
-                <div key={s.label} className="bg-card border border-border rounded-xl p-3">
-                  <span className="text-lg font-semibold text-foreground">{s.value}</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+            hasNoData ? (
+              <div className="border border-border rounded-xl p-5 text-center space-y-3">
+                <Home size={28} className="mx-auto text-muted-foreground" />
+                <p className="text-sm font-medium text-foreground">Welcome to Caselli!</p>
+                <p className="text-xs text-muted-foreground">Get started by adding your first deal or contact. I can help you track deadlines, draft emails, and manage your pipeline.</p>
+                <div className="space-y-0.5 pt-1">
+                  {[
+                    { label: "Add your first deal", message: "Help me add a new deal to my pipeline." },
+                    { label: "Import contacts", message: "Help me add my key contacts." },
+                  ].map((a) => (
+                    <button
+                      key={a.label}
+                      onClick={() => onQuickAction(a.message)}
+                      className="flex w-full items-center justify-between text-left text-sm text-foreground bg-transparent hover:bg-secondary/50 rounded-lg min-h-[44px] min-w-[44px] px-3 py-2.5 transition-all duration-200"
+                    >
+                      <span>{a.label}</span>
+                      <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+                    </button>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {stats.map((s) => (
+                    <div key={s.label} className="bg-card border border-border rounded-xl p-3">
+                      <span className="text-lg font-semibold text-foreground">{s.value}</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                {briefingSummary && (
+                  <p className="text-sm text-muted-foreground leading-relaxed px-0.5">
+                    {briefingSummary}
+                  </p>
+                )}
+              </div>
+            )
           )}
 
           {topic === "deals" && focusedDeal && (
