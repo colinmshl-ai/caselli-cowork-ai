@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import ContentCardRenderer from "./ContentCardRenderer";
+import StreamingText from "./StreamingText";
 import UndoButton from "./UndoButton";
 
 import EntityLinker from "./EntityLinker";
@@ -330,7 +331,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         // SSE streaming path
         const placeholderId = crypto.randomUUID();
         let firstDeltaReceived = false;
-        setMessages((prev) => [...prev, { id: placeholderId, role: "assistant", content: "" }]);
+        setMessages((prev) => [...prev, { id: placeholderId, role: "assistant", content: "", isStreaming: true }]);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -434,7 +435,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           lastContactId: lastContactIdFromDone,
         };
         setMessages((prev) =>
-          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, toolsUsed, contentTypeHint: contentTypeFromDone, undoActions: undoActionsFromDone, ...entityIds } : m))
+          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, isStreaming: false, toolsUsed, contentTypeHint: contentTypeFromDone, undoActions: undoActionsFromDone, ...entityIds } : m))
         );
 
         // Fetch the saved message from DB to get the real ID
@@ -684,18 +685,24 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
             >
               {m.role === "assistant" ? (
                 <>
-                  <EntityLinker dealId={m.lastDealId} contactId={m.lastContactId}>
-                    <ContentCardRenderer
-                      content={m.content}
-                      onAction={sendMessage}
-                      contentType={
-                        m.toolsUsed?.some((t: any) => CONTENT_TOOLS.includes(t.tool))
-                          ? "drafted"
-                          : "informational"
-                      }
-                      contentTypeHint={m.contentTypeHint || (m.metadata as any)?.content_type}
-                    />
-                  </EntityLinker>
+                  {m.isStreaming ? (
+                    <StreamingText content={m.content} />
+                  ) : (
+                    <div className="animate-fade-in">
+                      <EntityLinker dealId={m.lastDealId} contactId={m.lastContactId}>
+                        <ContentCardRenderer
+                          content={m.content}
+                          onAction={sendMessage}
+                          contentType={
+                            m.toolsUsed?.some((t: any) => CONTENT_TOOLS.includes(t.tool))
+                              ? "drafted"
+                              : "informational"
+                          }
+                          contentTypeHint={m.contentTypeHint || (m.metadata as any)?.content_type}
+                        />
+                      </EntityLinker>
+                    </div>
+                  )}
                   {(m.undoActions || (m.metadata as any)?.undo_actions)?.length > 0 && (
                     <UndoButton
                       actions={m.undoActions || (m.metadata as any)?.undo_actions}

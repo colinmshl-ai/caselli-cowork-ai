@@ -1,3 +1,4 @@
+import React from "react";
 import ReactMarkdown from "react-markdown";
 import { CheckCircle } from "lucide-react";
 
@@ -143,7 +144,7 @@ function SuggestionCard({
   );
 }
 
-const ConversationalRenderer = ({ content, onAction }: ConversationalRendererProps) => {
+const ConversationalRenderer = React.forwardRef<HTMLDivElement, ConversationalRendererProps>(({ content, onAction }, ref) => {
   const segments = parseConversational(content);
 
   if (segments.length === 0) {
@@ -196,6 +197,8 @@ const ConversationalRenderer = ({ content, onAction }: ConversationalRendererPro
       })}
     </div>
   );
-};
+});
+
+ConversationalRenderer.displayName = "ConversationalRenderer";
 
 export default ConversationalRenderer;
