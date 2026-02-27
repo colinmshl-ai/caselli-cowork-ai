@@ -895,57 +895,70 @@ MULTI-ACTION BEHAVIOR:
 
               currentMessages.push({ role: "assistant", content: assistantContent });
 
-              // Execute tools and send status events
+              // Execute tools — parallel when safe, sequential as fallback
               const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
-              for (const tool of iterationToolCalls) {
-                // Skip server-side tools (web_search is executed by Anthropic)
-                if (tool.name === "web_search") {
-                  toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: "Server-side tool — results already provided." });
-                  continue;
-                }
+              const customTools = iterationToolCalls.filter(t => t.name !== "web_search");
+              const webSearchTools = iterationToolCalls.filter(t => t.name === "web_search");
+
+              // Add web_search results immediately
+              for (const ws of webSearchTools) {
+                toolResults.push({ type: "tool_result", tool_use_id: ws.id, content: "Server-side tool — results already provided." });
+              }
+
+              // Send all tool_start events immediately for parallel UX
+              for (const tool of customTools) {
                 const desc = TOOL_DESCRIPTIONS[tool.name] || "Working on it...";
                 const toolEntry: { tool: string; description: string; deal_id?: string; contact_id?: string } = { tool: tool.name, description: desc };
                 if (tool.input?.deal_id) toolEntry.deal_id = tool.input.deal_id;
                 if (tool.input?.contact_id) toolEntry.contact_id = tool.input.contact_id;
                 toolsUsed.push(toolEntry);
                 sendSSE(controller, "tool_start", { tool: tool.name, status: desc, input_summary: summarizeToolInput(tool.name, tool.input) });
+              }
 
+              // Execute all custom tools in parallel
+              const toolPromises = customTools.map(async (tool) => {
                 const { result, taskType, taskDescription, undoAction } = await executeTool(
                   tool.name,
                   tool.input,
                   userId,
                   adminClient
                 );
-                if (undoAction) undoActions.push(undoAction);
 
-                // Send tool_done event with result summary
-                sendSSE(controller, "tool_done", { tool: tool.name, result_summary: summarizeToolResult(tool.name, result, taskDescription), success: !result?.error });
+                sendSSE(controller, "tool_done", { tool: tool.name, result_summary: summarizeToolResult(tool.name, result, taskDescription), success: !(result as any)?.error });
 
-                toolCallLog.push({ tool: tool.name, input: tool.input, result });
-
-                // Track entity IDs from tool results
-                if (result && typeof result === "object" && !Array.isArray(result)) {
-                  const r = result as Record<string, unknown>;
-                  if (tool.name === "create_deal" && r.id) lastCreatedDealId = r.id as string;
-                  if (tool.name === "add_contact" && r.id) lastCreatedContactId = r.id as string;
-                  if (tool.name === "get_deal_details" && r.id) lastCreatedDealId = r.id as string;
-                }
-                if (tool.name === "search_contacts" && Array.isArray(result) && result.length > 0) {
-                  lastCreatedContactId = (result[0] as Record<string, unknown>).id as string;
-                }
-
-                // Log to task_history
-                await adminClient.from("task_history").insert({
+                // Log to task_history (fire and forget)
+                adminClient.from("task_history").insert({
                   user_id: userId,
                   task_type: taskType,
                   description: taskDescription,
                   metadata: { tool: tool.name, input: tool.input },
                 }).then(({ error }) => { if (error) console.error("task_history insert error:", error); });
 
+                return { tool, result, taskType, taskDescription, undoAction };
+              });
+
+              const toolOutputs = await Promise.all(toolPromises);
+
+              for (const output of toolOutputs) {
+                if (output.undoAction) undoActions.push(output.undoAction);
+                toolCallLog.push({ tool: output.tool.name, input: output.tool.input, result: output.result });
+
+                // Track entity IDs from tool results
+                const result = output.result;
+                if (result && typeof result === "object" && !Array.isArray(result)) {
+                  const r = result as Record<string, unknown>;
+                  if (output.tool.name === "create_deal" && r.id) lastCreatedDealId = r.id as string;
+                  if (output.tool.name === "add_contact" && r.id) lastCreatedContactId = r.id as string;
+                  if (output.tool.name === "get_deal_details" && r.id) lastCreatedDealId = r.id as string;
+                }
+                if (output.tool.name === "search_contacts" && Array.isArray(result) && (result as unknown[]).length > 0) {
+                  lastCreatedContactId = ((result as unknown[])[0] as Record<string, unknown>).id as string;
+                }
+
                 toolResults.push({
                   type: "tool_result",
-                  tool_use_id: tool.id,
-                  content: JSON.stringify(result),
+                  tool_use_id: output.tool.id,
+                  content: JSON.stringify(output.result),
                 });
               }
 
