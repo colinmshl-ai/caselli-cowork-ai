@@ -324,6 +324,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         let toolsUsed: { tool: string; description: string }[] = [];
         let lastDealIdFromDone: string | undefined;
         let lastContactIdFromDone: string | undefined;
+        let contentTypeFromDone: string | undefined;
         let errorSeen = false;
         let updateScheduled = false;
 
@@ -375,6 +376,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 // Capture entity IDs from done event
                 lastDealIdFromDone = parsed.last_deal_id || undefined;
                 lastContactIdFromDone = parsed.last_contact_id || undefined;
+                // Capture content_type from done event
+                contentTypeFromDone = parsed.content_type || undefined;
                 // Capture chip context
                 if (parsed.chip_context) {
                   setChipContext(parsed.chip_context as ChipContext);
@@ -414,7 +417,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           lastContactId: lastContactIdFromDone,
         };
         setMessages((prev) =>
-          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, toolsUsed, ...entityIds } : m))
+          prev.map((m) => (m.id === placeholderId ? { ...m, content: finalContent, toolsUsed, contentTypeHint: contentTypeFromDone, ...entityIds } : m))
         );
 
         // Fetch the saved message from DB to get the real ID
@@ -428,7 +431,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         if (latestMessages?.[0]) {
           setMessages((prev) =>
-            prev.map((m) => (m.id === placeholderId ? { ...latestMessages[0], toolsUsed } : m))
+            prev.map((m) => (m.id === placeholderId ? { ...latestMessages[0], toolsUsed, contentTypeHint: contentTypeFromDone } : m))
           );
         }
 
@@ -655,6 +658,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                           ? "drafted"
                           : "informational"
                       }
+                      contentTypeHint={m.contentTypeHint || (m.metadata as any)?.content_type}
                     />
                   </EntityLinker>
                   {m.isError && lastUserMessage && (

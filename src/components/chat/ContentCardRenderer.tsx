@@ -5,17 +5,38 @@ import ListingCard from "./ListingCard";
 import DealSummaryCard from "./DealSummaryCard";
 import { Separator } from "@/components/ui/separator";
 
+type ContentTypeHint = "social_post" | "email" | "listing_description" | "conversational" | string;
+
 interface ContentCardRendererProps {
   content: string;
   onAction?: (message: string) => void;
   contentType?: "drafted" | "informational";
+  contentTypeHint?: ContentTypeHint;
+}
+
+/** Returns true if the content is clearly conversational — skip all card detection */
+function detectConversational(content: string): boolean {
+  const trimmed = content.trimStart();
+  // Starts with question words or conversational openers
+  if (/^(What|How|Would|Do you|I'd|Here's|Let me|Sure|Absolutely|Great|Of course|Happy to|I can|I'll|That's|Yes|No,)/i.test(trimmed)) {
+    return true;
+  }
+  // Contains conversational phrases
+  if (/here's what|I'd recommend|let me know|want me to|shall we|I can help|would you like/i.test(content)) {
+    return true;
+  }
+  // Contains numbered next-steps list
+  if (/\n\d+\.\s/.test(content)) {
+    return true;
+  }
+  return false;
 }
 
 function detectEmail(content: string) {
   const hasSubject = /\*?\*?Subject:?\*?\*?\s*(.+)/i.test(content);
-  const hasRecipient = /\*?\*?To:?\*?\*?\s*(.+)/i.test(content) || /\b(Dear |Hi |Hello |Hey )\w/i.test(content);
-  const hasClosing = /Best|Sincerely|Regards|Thanks|Warm regards/i.test(content);
-  return hasSubject || (hasRecipient && hasClosing);
+  const hasRecipient = /\*?\*?To:?\*?\*?\s*(.+)/i.test(content);
+  // Require BOTH Subject and To lines
+  return hasSubject && hasRecipient;
 }
 
 function detectDealSummary(content: string) {
@@ -26,18 +47,20 @@ function detectDealSummary(content: string) {
 }
 
 function detectSocial(content: string) {
-  const lines = content.split("\n").slice(0, 3).join("\n");
-  const hasPlatformInHeader = /\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b/i.test(lines);
+  const firstTwoLines = content.split("\n").slice(0, 2).join("\n");
+  // Require platform name followed by Post:/Caption: in a header pattern at the start
+  const hasPlatformHeader = /\*?\*?\b(Instagram|Facebook|LinkedIn|Twitter|X|TikTok)\b\s*(Post|Caption)\s*:?\*?\*?/i.test(firstTwoLines);
   const hasHashtags = /#\w+/.test(content);
-  const isConversational = /next steps|I'd suggest|want me to|shall we|^\d+\.\s/im.test(content);
-  return hasPlatformInHeader && hasHashtags && !isConversational;
+  return hasPlatformHeader && hasHashtags;
 }
 
 function detectListing(content: string) {
-  const hasBedBath = /\bbed/i.test(content) && /\bbath/i.test(content) && /\d/.test(content);
-  const hasMLS = /\bMLS\b|listing description|property description/i.test(content);
-  const hasPropertyDetails = /sq\s*ft|square feet|square foot/i.test(content) && /\d/.test(content);
-  return hasBedBath || hasMLS || hasPropertyDetails;
+  const lines = content.split("\n");
+  // Require property address on its own line (digit + street)
+  const hasAddressLine = lines.some(l => /^\*?\*?\d+\s+\w+/.test(l.trim()));
+  // Require bed/bath on a separate line
+  const hasBedBathLine = lines.some(l => /\bbed/i.test(l) && /\bbath/i.test(l) && /\d/.test(l));
+  return hasAddressLine && hasBedBathLine;
 }
 
 function parseEmail(content: string) {
@@ -162,7 +185,6 @@ function parseDealSummary(content: string) {
     const line = rawLine.replace(/[*#]+/g, "").replace(/^[-•]\s*/, "").trim();
     if (!line) continue;
 
-    // Check for deal rows: lines with an address or a stage indicator
     const hasAddress = addressPattern.test(line);
     const stageMatch = line.match(stagePattern);
     const priceMatch = line.match(pricePattern);
@@ -170,13 +192,12 @@ function parseDealSummary(content: string) {
     if (hasAddress || (stageMatch && priceMatch)) {
       pastIntro = true;
       const deal: { address: string; client?: string; stage?: string; price?: string } = {
-        address: hasAddress ? line.split(/[|·—–,]/)  [0].trim() : line.split(/[|·—–,]/)[0].trim(),
+        address: hasAddress ? line.split(/[|·—–,]/)[0].trim() : line.split(/[|·—–,]/)[0].trim(),
       };
 
       if (stageMatch) deal.stage = stageMatch[1];
       if (priceMatch) deal.price = priceMatch[0];
 
-      // Try to extract client name: "Client: Name" or "for Name"
       const clientMatch = line.match(/client:?\s*([^|·,]+)/i) || line.match(/for\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
       if (clientMatch) deal.client = clientMatch[1].trim();
 
@@ -184,7 +205,6 @@ function parseDealSummary(content: string) {
       continue;
     }
 
-    // Check for deadline lines
     const dlMatch = line.match(deadlinePattern);
     if (dlMatch) {
       pastIntro = true;
@@ -223,7 +243,73 @@ function splitSections(content: string): string[] {
   return result.length > 0 ? result : [content];
 }
 
-function renderSection(section: string, onAction?: (message: string) => void, contentType?: "drafted" | "informational") {
+function renderSection(
+  section: string,
+  onAction?: (message: string) => void,
+  contentType?: "drafted" | "informational",
+  contentTypeHint?: ContentTypeHint
+) {
+  // If we have a content_type hint from the backend, use it directly
+  if (contentTypeHint && contentTypeHint !== "conversational") {
+    if (contentTypeHint === "email") {
+      const { intro, to, subject, body } = parseEmail(section);
+      return (
+        <>
+          {intro && (
+            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+              <ReactMarkdown>{intro}</ReactMarkdown>
+            </div>
+          )}
+          <EmailCard to={to} subject={subject} body={body} onAction={onAction} contentType={contentType} />
+        </>
+      );
+    }
+    if (contentTypeHint === "social_post") {
+      const { intro, platform, postContent } = parseSocial(section);
+      return (
+        <>
+          {intro && (
+            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+              <ReactMarkdown>{intro}</ReactMarkdown>
+            </div>
+          )}
+          <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
+        </>
+      );
+    }
+    if (contentTypeHint === "listing_description") {
+      const { intro, address, stats, description } = parseListing(section);
+      return (
+        <>
+          {intro && (
+            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+              <ReactMarkdown>{intro}</ReactMarkdown>
+            </div>
+          )}
+          <ListingCard address={address} stats={stats} description={description} onAction={onAction} contentType={contentType} />
+        </>
+      );
+    }
+  }
+
+  // If hint says conversational, skip card detection entirely
+  if (contentTypeHint === "conversational") {
+    return (
+      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+        <ReactMarkdown>{section}</ReactMarkdown>
+      </div>
+    );
+  }
+
+  // Fallback: no hint (old messages) — use tightened regex with conversational guard
+  if (detectConversational(section)) {
+    return (
+      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-foreground text-foreground">
+        <ReactMarkdown>{section}</ReactMarkdown>
+      </div>
+    );
+  }
+
   if (detectEmail(section)) {
     const { intro, to, subject, body } = parseEmail(section);
     return (
@@ -288,11 +374,11 @@ function renderSection(section: string, onAction?: (message: string) => void, co
   );
 }
 
-const ContentCardRenderer = ({ content, onAction, contentType }: ContentCardRendererProps) => {
+const ContentCardRenderer = ({ content, onAction, contentType, contentTypeHint }: ContentCardRendererProps) => {
   const sections = splitSections(content);
 
   if (sections.length === 1) {
-    return <>{renderSection(sections[0], onAction, contentType)}</>;
+    return <>{renderSection(sections[0], onAction, contentType, contentTypeHint)}</>;
   }
 
   return (
@@ -304,7 +390,7 @@ const ContentCardRenderer = ({ content, onAction, contentType }: ContentCardRend
           style={{ animationDelay: `${i * 100}ms` }}
         >
           {i > 0 && <Separator className="my-3" />}
-          {renderSection(section, onAction, contentType)}
+          {renderSection(section, onAction, contentType, contentTypeHint)}
         </div>
       ))}
     </div>
