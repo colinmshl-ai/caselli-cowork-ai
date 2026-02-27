@@ -188,10 +188,10 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
   return (
     <>
       <div className="border-b border-border px-5 py-4">
-        <h1 className="text-sm font-semibold text-foreground">Activity</h1>
+        <h1 className="text-base font-semibold text-foreground">Activity</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-8">
+      <div className="flex-1 overflow-y-auto px-5 py-5">
         <div>
           <h2 className="text-lg font-semibold text-foreground">
             {greeting}, {displayName}
@@ -201,7 +201,9 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           </p>
         </div>
 
-        <div key={topic} className="space-y-8 transition-opacity duration-200 animate-in fade-in">
+        <div className="pt-1" />
+
+        <div key={topic} className="mt-6 transition-opacity duration-200 animate-in fade-in">
           {topic === "general" && (
             <div className="grid grid-cols-2 gap-3">
               {stats.map((s) => (
@@ -246,13 +248,10 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
             </div>
           )}
 
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <h3 className="font-serif text-sm font-medium text-foreground shrink-0" style={{ fontFamily: "'Playfair Display', serif" }}>
-                {sectionTitle}
-              </h3>
-              <div className="flex-1 h-px bg-border" />
-            </div>
+          <div className="mt-6">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+              {sectionTitle}
+            </h3>
             <div className="space-y-0.5">
               {quickActions.map((a) => (
                 <button
@@ -268,13 +267,10 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="font-serif text-sm font-medium text-foreground shrink-0" style={{ fontFamily: "'Playfair Display', serif" }}>
-              Recent Activity
-            </h3>
-            <div className="flex-1 h-px bg-border" />
-          </div>
+        <div className="mt-8">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+            Recent Activity
+          </h3>
           {taskHistory.length === 0 ? (
             <p className="text-sm text-muted-foreground">No activity yet</p>
           ) : (

@@ -521,7 +521,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   return (
     <>
       {/* Top bar */}
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between relative z-10">
+      <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between relative z-10">
         {/* History button — left */}
         <Sheet open={showConvos} onOpenChange={(open) => { setShowConvos(open); if (!open) setConvoSearch(""); }}>
           <SheetTrigger asChild>
@@ -699,7 +699,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
       {/* Input */}
       <div className="sticky bottom-0 z-10 bg-background px-5 py-4 border-t border-border">
-        <div className="flex items-end gap-2 rounded-2xl border border-transparent bg-secondary/50 px-5 py-3 transition-all focus-within:border-border focus-within:bg-card">
+        <div className="flex items-end gap-2 rounded-2xl border border-transparent bg-secondary/50 px-5 py-3 transition-all focus-within:border-border focus-within:bg-card shadow-none">
           <textarea
             ref={textareaRef}
             value={input}

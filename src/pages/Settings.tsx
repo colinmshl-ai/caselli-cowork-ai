@@ -173,7 +173,7 @@ const Settings = () => {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-5 py-4">
-        <h1 className="text-sm font-semibold text-foreground">Settings</h1>
+        <h1 className="text-base font-semibold text-foreground">Settings</h1>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-8 max-w-2xl">
         {/* Profile */}
@@ -383,7 +383,7 @@ const Settings = () => {
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="mb-8">
-    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">{title}</h2>
+    <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">{title}</h2>
     <div className="space-y-4">{children}</div>
   </div>
 );
