@@ -79,7 +79,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
       return data;
     },
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
     refetchOnWindowFocus: true,
   });
 
@@ -97,7 +97,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
       return data;
     },
     enabled: !!user,
-    refetchInterval: 10000,
+    refetchInterval: 30000,
     refetchOnWindowFocus: true,
   });
 
@@ -116,7 +116,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
       return data;
     },
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   const { data: focusedDeal } = useQuery({
