@@ -107,7 +107,7 @@ const TOOLS = [
   },
   {
     name: "draft_social_post",
-    description: "Draft a social media post. Before drafting, verify the deal stage matches the post type. New listing and open house posts should only be for active listings. Just sold posts should only be for closed deals. Default to Instagram unless the agent specifies otherwise. ALWAYS include 5-8 relevant hashtags. Include emojis appropriate to the platform. Types: new_listing, just_sold, open_house, market_update, tip, testimonial. Match the agent's brand voice exactly. After drafting, ask: Want me to adjust anything or adapt this for another platform?",
+    description: "Draft a social media post. FIRST verify the deal stage matches the post type (new_listing/open_house only for active listings, just_sold only for closed deals). ALWAYS use specific property data (price, beds/baths, sqft, features) from the deal - never write generic posts. Output format: Start with a brief 1-sentence intro, then on a new line write [Platform] Post: as a header, then the post content with 5-8 relevant local hashtags. Do NOT include next steps or suggestions in the post content itself - those go after the post. Keep posts under 200 words. After the post, on separate lines, ask if they want adjustments.",
     input_schema: {
       type: "object",
       properties: {
@@ -762,6 +762,16 @@ WRITING STYLE RULES:
   - After creating a deal → suggest drafting marketing materials, setting up deadline reminders, and notifying the client
   - After drafting a social post → suggest creating versions for other platforms, scheduling the post, and drafting a matching email blast
   - After adding a contact → suggest drafting an intro email, linking them to an existing deal, and setting a follow-up reminder
+
+CONTENT DRAFTING QUALITY RULES:
+- When drafting social posts, emails, or listing descriptions, write like a real agent would. No corporate marketing speak.
+- NEVER use these phrases in drafted content: "Don't miss out", "Mark your calendars", "Your dream home awaits", "This won't last long", "Act now", "Stunning", "Breathtaking", "One-of-a-kind"
+- Social posts should feel authentic and local. Reference the specific neighborhood, not generic "amazing location" language.
+- If the deal data includes specific features (sqft, beds, baths, price), USE THEM in the post. Don't write vague posts when you have real data.
+- Open house posts must include: address, date/time (ask if not provided), 2-3 specific property highlights from deal data, and relevant hashtags including the city/neighborhood.
+- If you don't have enough data to write a good post (no features, no price, no neighborhood), say so and ask for the missing details instead of writing a generic post.
+- Keep social posts to 150-200 words max. Quality over quantity.
+- Emails should be short and direct. No more than 3 short paragraphs.
 
 WEB SEARCH:
 - You have access to web search. Use it proactively when the user asks about market data, property values, neighborhood info, comparable sales, news, mortgage rates, or anything that benefits from current data.
