@@ -295,52 +295,101 @@ function splitSections(content: string): string[] {
   return result.length > 0 ? result : [content];
 }
 
+function splitCardFromConversation(content: string, hint: ContentTypeHint): { cardContent: string; conversationalTail: string } {
+  const conversationalPatterns = [
+    /\n\s*(?:next\s+steps|here(?:'s| are) (?:some|a few)|would you like|want me to|I can also|shall I|let me know|happy to)/i,
+    /\n\s*(?:\d+[\.\)]\s+(?:adapt|edit|schedule|draft|create|send|adjust|share|post))/i,
+  ];
+
+  let splitIdx = -1;
+  for (const pattern of conversationalPatterns) {
+    const match = content.search(pattern);
+    if (match > 0 && (splitIdx === -1 || match < splitIdx)) {
+      splitIdx = match;
+    }
+  }
+
+  if (splitIdx > 0) {
+    return {
+      cardContent: content.slice(0, splitIdx).trim(),
+      conversationalTail: content.slice(splitIdx).trim(),
+    };
+  }
+  return { cardContent: content, conversationalTail: "" };
+}
+
+function renderCardOnly(
+  section: string,
+  onAction?: (message: string) => void,
+  contentType?: "drafted" | "informational",
+  contentTypeHint?: ContentTypeHint
+) {
+  if (contentTypeHint === "email") {
+    const { intro, to, subject, body } = parseEmail(section);
+    return (
+      <>
+        {intro && (
+          <div className={PROSE_CLASSES}>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
+        )}
+        <EmailCard to={to} subject={subject} body={body} onAction={onAction} contentType={contentType} />
+      </>
+    );
+  }
+  if (contentTypeHint === "social_post") {
+    const { intro, platform, postContent } = parseSocial(section);
+    return (
+      <>
+        {intro && (
+          <div className={PROSE_CLASSES}>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
+        )}
+        <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
+      </>
+    );
+  }
+  if (contentTypeHint === "listing_description") {
+    const { intro, address, stats, description } = parseListing(section);
+    return (
+      <>
+        {intro && (
+          <div className={PROSE_CLASSES}>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
+        )}
+        <ListingCard address={address} stats={stats} description={description} onAction={onAction} contentType={contentType} />
+      </>
+    );
+  }
+  return (
+    <div className={PROSE_CLASSES}>
+      <ReactMarkdown remarkPlugins={[remarkBreaks]}>{section}</ReactMarkdown>
+    </div>
+  );
+}
+
 function renderSection(
   section: string,
   onAction?: (message: string) => void,
   contentType?: "drafted" | "informational",
   contentTypeHint?: ContentTypeHint
 ) {
-  // If we have a content_type hint from the backend, use it directly
+  // For hinted card types, split card content from conversational tail
   if (contentTypeHint && contentTypeHint !== "conversational") {
-    if (contentTypeHint === "email") {
-      const { intro, to, subject, body } = parseEmail(section);
-      return (
-        <>
-          {intro && (
-            <div className={PROSE_CLASSES}>
-               <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
-            </div>
-          )}
-          <EmailCard to={to} subject={subject} body={body} onAction={onAction} contentType={contentType} />
-        </>
-      );
-    }
-    if (contentTypeHint === "social_post") {
-      const { intro, platform, postContent } = parseSocial(section);
-      return (
-        <>
-          {intro && (
-            <div className={PROSE_CLASSES}>
-               <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
-            </div>
-          )}
-          <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
-        </>
-      );
-    }
-    if (contentTypeHint === "listing_description") {
-      const { intro, address, stats, description } = parseListing(section);
-      return (
-        <>
-          {intro && (
-            <div className={PROSE_CLASSES}>
-               <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
-            </div>
-          )}
-          <ListingCard address={address} stats={stats} description={description} onAction={onAction} contentType={contentType} />
-        </>
-      );
+    if (contentTypeHint === "email" || contentTypeHint === "social_post" || contentTypeHint === "listing_description") {
+      const { cardContent, conversationalTail } = splitCardFromConversation(section, contentTypeHint);
+      const cardElement = renderCardOnly(cardContent, onAction, contentType, contentTypeHint);
+      if (conversationalTail) {
+        return (
+          <>
+            {cardElement}
+            <ConversationalRenderer content={conversationalTail} onAction={onAction} />
+          </>
+        );
+      }
+      return cardElement;
     }
   }
 
@@ -355,31 +404,51 @@ function renderSection(
   }
 
   if (detectSocial(section)) {
-    const { intro, platform, postContent } = parseSocial(section);
-    return (
+    const { cardContent, conversationalTail } = splitCardFromConversation(section, "social_post");
+    const { intro, platform, postContent } = parseSocial(cardContent);
+    const cardElement = (
       <>
         {intro && (
           <div className={PROSE_CLASSES}>
-              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
-            </div>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
         )}
         <SocialPostCard platform={platform} content={postContent} onAction={onAction} contentType={contentType} />
       </>
     );
+    if (conversationalTail) {
+      return (
+        <>
+          {cardElement}
+          <ConversationalRenderer content={conversationalTail} onAction={onAction} />
+        </>
+      );
+    }
+    return cardElement;
   }
 
   if (detectEmail(section)) {
-    const { intro, to, subject, body } = parseEmail(section);
-    return (
+    const { cardContent, conversationalTail } = splitCardFromConversation(section, "email");
+    const { intro, to, subject, body } = parseEmail(cardContent);
+    const cardElement = (
       <>
         {intro && (
           <div className={PROSE_CLASSES}>
-              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
-            </div>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
         )}
         <EmailCard to={to} subject={subject} body={body} onAction={onAction} contentType={contentType} />
       </>
     );
+    if (conversationalTail) {
+      return (
+        <>
+          {cardElement}
+          <ConversationalRenderer content={conversationalTail} onAction={onAction} />
+        </>
+      );
+    }
+    return cardElement;
   }
 
   if (detectDealSummary(section)) {
@@ -388,8 +457,8 @@ function renderSection(
       <>
         {intro && (
           <div className={PROSE_CLASSES}>
-              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
-            </div>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
         )}
         <DealSummaryCard intro={intro} deals={deals} deadlines={deadlines} />
       </>
@@ -397,17 +466,27 @@ function renderSection(
   }
 
   if (detectListing(section)) {
-    const { intro, address, stats, description } = parseListing(section);
-    return (
+    const { cardContent, conversationalTail } = splitCardFromConversation(section, "listing_description");
+    const { intro, address, stats, description } = parseListing(cardContent);
+    const cardElement = (
       <>
         {intro && (
           <div className={PROSE_CLASSES}>
-              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
-            </div>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
         )}
         <ListingCard address={address} stats={stats} description={description} onAction={onAction} contentType={contentType} />
       </>
     );
+    if (conversationalTail) {
+      return (
+        <>
+          {cardElement}
+          <ConversationalRenderer content={conversationalTail} onAction={onAction} />
+        </>
+      );
+    }
+    return cardElement;
   }
 
   // Plain markdown
