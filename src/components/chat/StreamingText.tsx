@@ -26,7 +26,7 @@ const StreamingText = React.memo(({ content }: StreamingTextProps) => {
     <div className={PROSE_CLASSES}>
       {renderedPrefix}
       <span style={{ whiteSpace: 'pre-wrap' }}>{tailLine}</span>
-      <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
+      <span className="inline-block w-0.5 h-3.5 bg-primary/50 animate-pulse ml-0.5 align-text-bottom rounded-full" />
     </div>
   );
 });
