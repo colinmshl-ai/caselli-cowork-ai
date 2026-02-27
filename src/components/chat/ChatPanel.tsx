@@ -521,7 +521,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   return (
     <>
       {/* Top bar */}
-      <div className="px-4 py-3.5 flex items-center justify-between shadow-sm relative z-10">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between relative z-10">
         {/* History button — left */}
         <Sheet open={showConvos} onOpenChange={(open) => { setShowConvos(open); if (!open) setConvoSearch(""); }}>
           <SheetTrigger asChild>
@@ -599,7 +599,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 md:space-y-8" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6 md:space-y-8" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
         {messages.length === 0 && !typingStatus && (
           <div className="flex flex-col items-center justify-center h-full gap-6">
             <div className="text-center">
@@ -609,7 +609,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
               </h2>
               <p className="text-sm text-muted-foreground mt-2">What can I help you with today?</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-md w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md w-full">
               {[
                 { prompt: "I just got a new listing at...", icon: Home },
                 { prompt: "Draft a social post for...", icon: Camera },
@@ -662,7 +662,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         {/* Starter prompts below welcome message when no user messages yet */}
         {messages.length > 0 && messages.every((m) => m.role === "assistant") && !typingStatus && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-md">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
             {[
               { prompt: "I just got a new listing at...", icon: Home },
               { prompt: "Draft a social post for...", icon: Camera },
@@ -698,7 +698,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       )}
 
       {/* Input */}
-      <div className="sticky bottom-0 z-10 bg-background px-4 py-3 border-t border-border">
+      <div className="sticky bottom-0 z-10 bg-background px-5 py-4 border-t border-border">
         <div className="flex items-end gap-2 rounded-2xl border border-transparent bg-secondary/50 px-5 py-3 transition-all focus-within:border-border focus-within:bg-card">
           <textarea
             ref={textareaRef}

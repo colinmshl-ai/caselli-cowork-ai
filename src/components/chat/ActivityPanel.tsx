@@ -203,7 +203,7 @@ const ActivityPanel = ({ onQuickAction, conversationContext }: ActivityPanelProp
 
         <div key={topic} className="space-y-8 transition-opacity duration-200 animate-in fade-in">
           {topic === "general" && (
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-3">
               {stats.map((s) => (
                 <div key={s.label} className="bg-card border border-border rounded-lg p-3">
                   <span className="text-lg font-semibold text-foreground">{s.value}</span>
