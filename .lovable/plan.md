@@ -1,19 +1,55 @@
 
 
-## Plan: Add Property Data Enrichment via RentCast API — ✅ IMPLEMENTED
+## Plan: PropertyListingCard Component + Integration
 
-### What was done
+### 1. Create `src/components/chat/PropertyListingCard.tsx`
 
-1. **Database Migration** — Added 10 enrichment columns to `deals` table: `bedrooms`, `bathrooms`, `square_footage`, `lot_size`, `year_built`, `property_type`, `last_sale_price`, `last_sale_date`, `property_photos` (text[]), `enrichment_data` (jsonb).
+New component with:
+- **Hero image**: First photo from `property_photos` array with `+N photos` badge overlay; gradient placeholder with `Home` icon if no photos
+- **Address title** + prominent price display
+- **Stats row**: `BedDouble` + beds, `Bath` + baths, `Ruler` + sqft, `Calendar` + year built (all from lucide-react)
+- **Property type badge**: `px-2.5 py-0.5 text-[11px]` per design system
+- **Attribution**: "Enriched via RentCast" in `text-[10px] text-muted-foreground`
+- **Action buttons**: "Draft Post" / "Email Blast" / "Listing Description" calling `onAction` with contextual messages
+- **Style**: `border-l-4 border-l-blue-500 rounded-xl bg-card border-border animate-fade-in-up` (blue-500 to distinguish from email's blue-400 and social's violet)
 
-2. **RENTCAST_API_KEY secret** — Added and configured.
+Props interface:
+```typescript
+interface PropertyListingCardProps {
+  address: string;
+  price?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  squareFootage?: number;
+  yearBuilt?: number;
+  propertyType?: string;
+  photos?: string[];
+  onAction?: (message: string) => void;
+}
+```
 
-3. **Edge Function (`supabase/functions/chat/index.ts`)**:
-   - Added `enrich_property` tool definition with address/city/state/deal_id schema
-   - Added tool handler that calls RentCast API, extracts property data, updates deal record
-   - Added `enrich_property` entries in `summarizeToolInput`, `summarizeToolResult`, `TOOL_DESCRIPTIONS`
-   - Updated `create_deal` handler to auto-enrich by parsing city/state from the address
-   - Updated system prompt with PROPERTY ENRICHMENT instructions
+### 2. Update `ContentCardRenderer.tsx`
 
-### Next Steps (Prompt 3)
-- Add `PropertyCard` component to render enrichment data with photos in the chat UI
+- Import `PropertyListingCard`
+- Add `"property_enriched"` to the `ContentTypeHint` type
+- Add `detectPropertyEnriched()` function: detects ✅ lines with bed/bath/sqft patterns
+- Add `parsePropertyEnriched()`: extracts address, price, beds, baths, sqft, year built, photos from the structured ✅ confirmation text
+- In `renderCardOnly()`: add case for `contentTypeHint === "property_enriched"` that parses and renders `PropertyListingCard`
+- In `renderSection()`: add `"property_enriched"` to the hint check alongside email/social/listing
+
+### 3. Update `ToolProgressCard.tsx`
+
+- Add import: `Search` from lucide-react
+- Add to `TOOL_ICONS`: `enrich_property: Search`
+
+### 4. Update `supabase/functions/chat/index.ts`
+
+- Add `enrich_property: "property_enriched"` to `DRAFT_CONTENT_TYPE_MAP` (line ~1384)
+- Also map `create_deal` to `"property_enriched"` when `enrich_property` was also used in the same turn (check toolCallLog for both)
+
+### Files Modified
+- `src/components/chat/PropertyListingCard.tsx` (new)
+- `src/components/chat/ContentCardRenderer.tsx`
+- `src/components/chat/ToolProgressCard.tsx`
+- `supabase/functions/chat/index.ts`
+
