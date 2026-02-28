@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 const PROSE_CLASSES =
   "prose prose-sm max-w-none prose-p:my-2 prose-p:leading-relaxed [&>p]:mb-3 prose-ul:my-2 prose-li:my-1 prose-li:leading-relaxed prose-ul:pl-4 prose-headings:my-2 prose-strong:text-foreground prose-a:text-primary text-foreground";
 
-type ContentTypeHint = "social_post" | "email" | "listing_description" | "conversational" | "property_enriched" | string;
+type ContentTypeHint = "social_post" | "email" | "listing_description" | "conversational" | "property_enriched" | "deal_summary" | string;
 
 interface ContentCardRendererProps {
   content: string;
@@ -306,22 +306,28 @@ function parseDealSummary(content: string) {
 
   const stagePattern = /\b(lead|active|under[\s_]?contract|due[\s_]?diligence|clear[\s_]?to[\s_]?close|closed|fell[\s_]?through|pending)\b/i;
   const pricePattern = /\$[\d,]+/;
-  const addressPattern = /^\d+\s+\w+/;
+  // Broader address patterns: "123 Main St", "**123 Main St**", or any line starting with digits+street
+  const addressPattern = /(?:^\*{0,2}\d+\s+\w+)|(?:^\d+\s+\w+)/;
   const deadlinePattern = /\b(closing|inspection|appraisal|financing|deadline)\b[:\s]*(.+)/i;
   const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\w+ \d{1,2},?\s*\d{4}|\d{4}-\d{2}-\d{2})/;
 
   for (const rawLine of lines) {
-    const line = rawLine.replace(/[*#]+/g, "").replace(/^[-•]\s*/, "").trim();
+    const line = rawLine.replace(/\*{1,2}/g, "").replace(/^#{1,4}\s*/, "").replace(/^[-•]\s*/, "").trim();
     if (!line) continue;
 
     const hasAddress = addressPattern.test(line);
     const stageMatch = line.match(stagePattern);
     const priceMatch = line.match(pricePattern);
 
-    if (hasAddress || (stageMatch && priceMatch)) {
+    // Count how many signals we have
+    const signals = [hasAddress, !!stageMatch, !!priceMatch].filter(Boolean).length;
+
+    // Accept if ANY TWO signals match, or if address alone (likely a deal row)
+    if (signals >= 2 || (hasAddress && line.includes("|"))) {
       pastIntro = true;
+      const segments = line.split(/[|·—–]/);
       const deal: { address: string; client?: string; stage?: string; price?: string } = {
-        address: hasAddress ? line.split(/[|·—–,]/)[0].trim() : line.split(/[|·—–,]/)[0].trim(),
+        address: segments[0].trim(),
       };
 
       if (stageMatch) deal.stage = stageMatch[1];
@@ -330,8 +336,27 @@ function parseDealSummary(content: string) {
       const clientMatch = line.match(/client:?\s*([^|·,]+)/i) || line.match(/for\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
       if (clientMatch) deal.client = clientMatch[1].trim();
 
+      // If no address found but we have price + stage, use first segment as label
+      if (!hasAddress && !deal.address) {
+        deal.address = segments[0].trim() || "Deal";
+      }
+
       deals.push(deal);
       continue;
+    }
+
+    // Also accept lines with just a price + descriptive text (treat text as address/label)
+    if (priceMatch && line.length > 10 && !deadlinePattern.test(line)) {
+      const textPart = line.replace(pricePattern, "").replace(/[|·—–,]/g, " ").trim();
+      if (textPart.length > 3) {
+        pastIntro = true;
+        deals.push({
+          address: textPart,
+          price: priceMatch[0],
+          stage: stageMatch?.[1],
+        });
+        continue;
+      }
     }
 
     const dlMatch = line.match(deadlinePattern);
@@ -358,7 +383,7 @@ function parseDealSummary(content: string) {
     }
   }
 
-  return { intro: introLines.join("\n").trim(), deals, deadlines };
+  return { intro: introLines.join("\n").trim(), deals, deadlines, rawContent: content };
 }
 
 /** Split content into sections on "---" horizontal rules, but avoid over-splitting */
@@ -468,6 +493,19 @@ function renderCardOnly(
       </>
     );
   }
+  if (contentTypeHint === "deal_summary") {
+    const { intro, deals, deadlines, rawContent } = parseDealSummary(section);
+    return (
+      <>
+        {intro && (
+          <div className={PROSE_CLASSES}>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
+        )}
+        <DealSummaryCard intro={intro} deals={deals} deadlines={deadlines} rawContent={rawContent} />
+      </>
+    );
+  }
   if (contentTypeHint === "property_enriched") {
     const { intro, address, price, bedrooms, bathrooms, squareFootage, yearBuilt, propertyType } = parsePropertyEnriched(section);
     const hasStats = bedrooms != null || bathrooms != null || squareFootage != null;
@@ -513,7 +551,7 @@ function renderSection(
 ) {
   // For hinted card types, split card content from conversational tail
   if (contentTypeHint && contentTypeHint !== "conversational") {
-    if (contentTypeHint === "email" || contentTypeHint === "social_post" || contentTypeHint === "listing_description" || contentTypeHint === "property_enriched") {
+    if (contentTypeHint === "email" || contentTypeHint === "social_post" || contentTypeHint === "listing_description" || contentTypeHint === "property_enriched" || contentTypeHint === "deal_summary") {
       const { cardContent, conversationalTail } = splitCardFromConversation(section, contentTypeHint);
       const cardElement = renderCardOnly(cardContent, onAction, contentType, contentTypeHint);
       if (conversationalTail) {
@@ -621,17 +659,27 @@ function renderSection(
   }
 
   if (detectDealSummary(section)) {
-    const { intro, deals, deadlines } = parseDealSummary(section);
-    return (
+    const { cardContent, conversationalTail } = splitCardFromConversation(section, "deal_summary");
+    const { intro, deals, deadlines, rawContent } = parseDealSummary(cardContent);
+    const cardElement = (
       <>
         {intro && (
           <div className={PROSE_CLASSES}>
             <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
           </div>
         )}
-        <DealSummaryCard intro={intro} deals={deals} deadlines={deadlines} />
+        <DealSummaryCard intro={intro} deals={deals} deadlines={deadlines} rawContent={rawContent} />
       </>
     );
+    if (conversationalTail) {
+      return (
+        <>
+          {cardElement}
+          <ConversationalRenderer content={conversationalTail} onAction={onAction} />
+        </>
+      );
+    }
+    return cardElement;
   }
 
   if (detectListing(section)) {

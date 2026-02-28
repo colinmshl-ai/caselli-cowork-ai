@@ -1,4 +1,6 @@
 import { Home, Clock, AlertTriangle } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 
 interface DealRow {
   address: string;
@@ -17,6 +19,7 @@ interface DealSummaryCardProps {
   intro: string;
   deals: DealRow[];
   deadlines: Deadline[];
+  rawContent?: string;
 }
 
 const STAGE_COLORS: Record<string, string> = {
@@ -47,10 +50,16 @@ function getUrgencyClass(days: number) {
   return "text-muted-foreground";
 }
 
-const DealSummaryCard = ({ intro, deals, deadlines }: DealSummaryCardProps) => {
+const PROSE_CLASSES =
+  "prose prose-sm max-w-none prose-p:my-2 prose-p:leading-relaxed prose-ul:my-2 prose-li:my-1 prose-li:leading-relaxed prose-ul:pl-4 prose-headings:my-2 prose-strong:text-foreground prose-a:text-primary text-foreground";
+
+const DealSummaryCard = ({ intro, deals, deadlines, rawContent }: DealSummaryCardProps) => {
   const activeDealCount = deals.filter(
     (d) => d.stage && !/closed|fell.?through/i.test(d.stage)
   ).length;
+
+  const hasStructuredData = deals.length > 0 || deadlines.length > 0;
+  const showFallback = !hasStructuredData && rawContent;
 
   return (
     <div className="border border-border border-l-4 border-l-blue-400 rounded-xl overflow-hidden bg-card mt-3 animate-fade-in-up">
@@ -61,6 +70,15 @@ const DealSummaryCard = ({ intro, deals, deadlines }: DealSummaryCardProps) => {
           {intro ? "Deal Summary" : "Your Pipeline"}
         </span>
       </div>
+
+      {/* Fallback: raw content when parsing failed */}
+      {showFallback && (
+        <div className="px-4 py-3">
+          <div className={PROSE_CLASSES}>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{rawContent}</ReactMarkdown>
+          </div>
+        </div>
+      )}
 
       {/* Deal rows */}
       {deals.length > 0 && (
@@ -117,13 +135,15 @@ const DealSummaryCard = ({ intro, deals, deadlines }: DealSummaryCardProps) => {
         </div>
       )}
 
-      {/* Footer */}
-      <div className="px-4 py-2 border-t border-border">
-        <span className="text-[11px] text-muted-foreground">
-          {activeDealCount} active deal{activeDealCount !== 1 ? "s" : ""}
-          {deals.length !== activeDealCount && ` · ${deals.length} total`}
-        </span>
-      </div>
+      {/* Footer — only show when we have structured deal data */}
+      {deals.length > 0 && (
+        <div className="px-4 py-2 border-t border-border">
+          <span className="text-[11px] text-muted-foreground">
+            {activeDealCount} active deal{activeDealCount !== 1 ? "s" : ""}
+            {deals.length !== activeDealCount && ` · ${deals.length} total`}
+          </span>
+        </div>
+      )}
     </div>
   );
 };
