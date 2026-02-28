@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 
@@ -11,22 +11,18 @@ interface StreamingTextProps {
 
 const StreamingText = React.memo(({ content }: StreamingTextProps) => {
   const isEmpty = !content.trim();
-  const lastNewline = content.lastIndexOf('\n');
-  const stablePrefix = lastNewline > 0 ? content.slice(0, lastNewline) : '';
-  const tailLine = lastNewline > 0 ? content.slice(lastNewline + 1) : content;
 
-  const renderedPrefix = useMemo(
-    () =>
-      stablePrefix ? (
-        <ReactMarkdown remarkPlugins={[remarkBreaks]}>{stablePrefix}</ReactMarkdown>
-      ) : null,
-    [stablePrefix]
-  );
+  const [debouncedContent, setDebouncedContent] = useState(content);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedContent(content), 100);
+    return () => clearTimeout(timer);
+  }, [content]);
 
   if (isEmpty) {
     return (
       <div className={PROSE_CLASSES}>
-        <span className="text-muted-foreground italic">Generating response...</span>
+        <span className="text-muted-foreground italic">Thinking...</span>
         <span className="inline-block w-0.5 h-3.5 bg-primary/50 animate-pulse ml-0.5 align-text-bottom rounded-full" />
       </div>
     );
@@ -34,8 +30,7 @@ const StreamingText = React.memo(({ content }: StreamingTextProps) => {
 
   return (
     <div className={PROSE_CLASSES}>
-      {renderedPrefix}
-      <span style={{ whiteSpace: 'pre-wrap' }}>{tailLine}</span>
+      <ReactMarkdown remarkPlugins={[remarkBreaks]}>{debouncedContent}</ReactMarkdown>
       <span className="inline-block w-0.5 h-3.5 bg-primary/50 animate-pulse ml-0.5 align-text-bottom rounded-full" />
     </div>
   );
