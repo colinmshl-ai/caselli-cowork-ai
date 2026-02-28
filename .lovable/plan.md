@@ -1,49 +1,29 @@
 
 
-## Plan: SSE Connection Resilience — Watchdog + AbortController + Client Disconnect Detection
+## Plan: Fix DealSummaryCard Parsing + Fallback
 
-### 1. `ChatPanel.tsx` — AbortController + Watchdog Timer
+### 1. `parseDealSummary()` in `ContentCardRenderer.tsx` — More resilient parser
 
-**Lines 316-470** (the `sendMessage` try block with SSE streaming):
+**Lines 300-362**: Improve deal row extraction:
+- Relax the deal detection: currently requires `hasAddress || (stageMatch && priceMatch)`. Change to accept lines matching ANY TWO of: address, stage, price. Also accept lines with just a price + any descriptive text (treat the text as the address/label).
+- Add a broader address pattern: also match lines like `"- Property Name | $450,000 | Active"` or markdown bold addresses like `**123 Main St**`.
+- Return the raw content alongside parsed data: add `rawContent: string` to the return type so the card can fall back.
 
-- Create an `AbortController` before the fetch call (line 320) and pass `signal: controller.signal` to fetch options
-- Store the controller in a ref (`abortControllerRef`) so the Stop button and unmount can access it
-- Add a `lastEventTime` variable initialized to `Date.now()` before the read loop (line 351)
-- Update `lastEventTime = Date.now()` inside the `for (const evt of events)` loop (line 359) on every parsed event
-- Add a `watchdog` interval (every 5s) that checks `Date.now() - lastEventTime > 45000`. If triggered:
-  - Call `controller.abort()`
-  - Set `errorSeen = true`
-  - Set the streaming content to the timeout error message
-  - `break` out of the read loop
-- Clear the watchdog interval after the read loop exits (after line 470)
-- In the catch block (line 536), handle `AbortError` gracefully (don't show generic error if it was a user-initiated abort)
+### 2. `DealSummaryCard.tsx` — Fallback when parsing fails
 
-**New ref + cleanup** (around lines 125-132):
-- Add `const abortControllerRef = useRef<AbortController | null>(null)`
-- Add `const lastEventTimeRef = useRef<number>(0)` for Stop button freshness check
-- Add a cleanup effect that aborts on unmount
+**Lines 50-128**: Add a `rawContent?: string` prop. When `deals.length === 0 && deadlines.length === 0 && rawContent`:
+- Render the raw content as formatted markdown inside the card frame (keeps the Deal Summary header + blue accent) instead of showing "0 active deals"
+- Only show the "N active deals" footer when `deals.length > 0`
 
-**Lines 847-854** (Send button area): No existing Stop button — we need to add one. When `typingStatus` is truthy (streaming), show a "Stop" button instead of the Send button. Only show it if `lastEventTimeRef.current` is within 10 seconds.
+### 3. `renderCardOnly()` + `renderSection()` — Add `deal_summary` hint support
 
-### 2. `supabase/functions/chat/index.ts` — Client Disconnect Detection
+**Line 14**: Add `"deal_summary"` to `ContentTypeHint` union.
 
-**Line 1260** (inside `start(controller)`): Add abort listener:
-```typescript
-let clientDisconnected = false;
-req.signal.addEventListener("abort", () => { clientDisconnected = true; });
-```
+**Lines 500-505** (end of `renderCardOnly`): Add a `deal_summary` branch before the default return — parse with `parseDealSummary`, pass `rawContent` to `DealSummaryCard` as fallback.
 
-**Line 1272** (top of `while` loop): Add check:
-```typescript
-if (clientDisconnected) break;
-```
-
-**Line 1440** (after `Promise.all(toolPromises)` completes, before continuing loop): Add check:
-```typescript
-if (clientDisconnected) break;
-```
+**Line 516**: Add `"deal_summary"` to the hint check so it gets the `splitCardFromConversation` treatment like other card types.
 
 ### Files Modified
-- `src/components/chat/ChatPanel.tsx` — AbortController, watchdog timer, Stop button, unmount cleanup
-- `supabase/functions/chat/index.ts` — `req.signal` abort listener + disconnect checks in agentic loop
+- `src/components/chat/ContentCardRenderer.tsx` — parser improvements, hint support, rawContent passthrough
+- `src/components/chat/DealSummaryCard.tsx` — rawContent fallback rendering, conditional footer
 
