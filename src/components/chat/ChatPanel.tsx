@@ -728,7 +728,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
               className={`text-sm leading-relaxed ${
                 m.role === "user"
                   ? "border border-border bg-transparent rounded-xl px-4 py-2.5 max-w-[70%]"
-                  : "max-w-[85%] md:max-w-[95%] text-foreground"
+                  : `max-w-[85%] md:max-w-[95%] text-foreground ${m.isError ? "bg-destructive/5 border border-destructive/20 rounded-xl px-4 py-3" : ""}`
               }`}
             >
               {m.role === "assistant" ? (
