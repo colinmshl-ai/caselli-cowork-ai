@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, ArrowUp, Clock, Search, Home, Camera, BarChart3, Users, RotateCcw, Activity, Square } from "lucide-react";
+import { Plus, ArrowUp, Clock, Search, RotateCcw, Activity, Square } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
@@ -750,22 +750,20 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 <span className="font-serif italic font-medium text-foreground">Caselli</span>{" "}
                 <span className="font-sans font-light text-muted-foreground">Cowork</span>
               </h2>
-              <p className="text-sm text-muted-foreground mt-2">What can I help you with today?</p>
+              <p className="text-sm text-muted-foreground mt-2">Your AI coworker for real estate</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md w-full">
+            <div className="flex flex-wrap justify-center gap-2.5 max-w-lg w-full">
               {[
-                { prompt: "I just got a new listing at...", icon: Home },
-                { prompt: "Draft a social post for...", icon: Camera },
-                { prompt: "Give me a pipeline overview", icon: BarChart3 },
-                { prompt: "Help me follow up with a client", icon: Users },
-              ].map(({ prompt, icon: Icon }) => (
+                "Add a new listing to my pipeline",
+                "Draft social posts for my active listings",
+                "Review my deadlines this week",
+              ].map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => sendMessage(prompt)}
-                  className="flex items-center gap-3 text-left text-sm px-4 py-3.5 rounded-xl border border-border bg-card text-foreground hover:border-primary/30 transition-all"
+                  className="rounded-xl border border-border/60 px-4 py-2.5 text-sm text-foreground hover:bg-secondary/60 hover:border-border hover:scale-[1.02] transition-all cursor-pointer"
                 >
-                  <Icon size={16} className="text-muted-foreground shrink-0" />
-                  <span>{prompt}</span>
+                  {prompt}
                 </button>
               ))}
             </div>
@@ -838,20 +836,18 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
 
         {/* Starter prompts below welcome message when no user messages yet */}
         {messages.length > 0 && messages.every((m) => m.role === "assistant") && !typingStatus && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
+          <div className="flex flex-wrap gap-2.5">
             {[
-              { prompt: "I just got a new listing at...", icon: Home },
-              { prompt: "Draft a social post for...", icon: Camera },
-              { prompt: "Give me a pipeline overview", icon: BarChart3 },
-              { prompt: "Help me follow up with a client", icon: Users },
-            ].map(({ prompt, icon: Icon }) => (
+              "Add a new listing to my pipeline",
+              "Draft social posts for my active listings",
+              "Review my deadlines this week",
+            ].map((prompt) => (
               <button
                 key={prompt}
                 onClick={() => sendMessage(prompt)}
-                className="flex items-center gap-3 text-left text-sm px-4 py-3.5 rounded-xl border border-border bg-card text-foreground hover:border-primary/30 transition-all"
+                className="rounded-xl border border-border/60 px-4 py-2.5 text-sm text-foreground hover:bg-secondary/60 hover:border-border hover:scale-[1.02] transition-all cursor-pointer"
               >
-                <Icon size={16} className="text-muted-foreground shrink-0" />
-                <span>{prompt}</span>
+                {prompt}
               </button>
             ))}
           </div>
@@ -890,12 +886,13 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       <div className="sticky bottom-0 z-10 bg-background px-5 py-4 border-t border-border">
         <div className="max-w-2xl mx-auto w-full">
           <div className="flex items-end gap-2 rounded-2xl border border-transparent bg-secondary/50 px-5 py-3 transition-all focus-within:border-border focus-within:bg-card shadow-none">
+            <span className="text-[10px] text-muted-foreground/50 self-center hidden md:inline select-none">⌘K</span>
             <textarea
               ref={textareaRef}
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Caselli Cowork anything..."
+              placeholder="Message Caselli..."
               rows={1}
               className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none max-h-[120px] min-h-[44px] md:min-h-0"
             />
