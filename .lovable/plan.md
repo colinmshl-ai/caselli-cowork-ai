@@ -1,51 +1,55 @@
 
 
-## Improve Tool Progress Card Visibility and Tracking
+## Increase Agentic Loop Cap and Add Smart Controls
 
-### File 1: `src/components/chat/ToolProgressCard.tsx`
+### File: `supabase/functions/chat/index.ts`
 
-**Props change**: Add `stepInfo?: { current: number; total: number }` prop alongside `card`.
+#### 1. Update `parseAnthropicStream` to return token usage (lines 793-887)
+- Change return type from `Promise<"end_turn" | "tool_use">` to `Promise<{ stopReason: string; inputTokens: number; outputTokens: number }>`
+- Track tokens from `message_start` event (`event.message.usage.input_tokens`) and `message_delta` event (`event.delta.usage?.output_tokens` or `event.usage?.output_tokens`)
+- Return `{ stopReason, inputTokens, outputTokens }` instead of just `stopReason`
 
-**Collapse delay**: Change 800ms → 3000ms (line 34).
+#### 2. Update the agentic loop (lines 1270-1476)
 
-**Collapsed badge improvements** (lines 42-48):
-- Wrap in a group with hover state: `const [hovered, setHovered] = useState(false)`
-- If `hovered`, render the full expanded card instead of the badge
-- Badge: change `text-[10px]` → `text-xs`, add `cursor-pointer`
-- Add left border color based on tool category:
-  - Deal tools (`get_active_deals`, `get_deal_details`, `check_upcoming_deadlines`, `create_deal`, `update_deal`) → `border-l-2 border-l-emerald-500`
-  - Content tools (`draft_social_post`, `draft_email`, `draft_listing_description`) → `border-l-2 border-l-violet-500`
-  - Contact tools (`search_contacts`, `add_contact`, `update_contact`) → `border-l-2 border-l-blue-500`
-  - Default → `border-l-2 border-l-gray-400`
+**Cap increase**: Change `while (iterations < 3)` → `while (iterations < 5)` (line 1275)
 
-**Step counter**: In the running state (lines 57-64), show `Step {current} of {total}` next to "Working..." when `stepInfo` is provided.
+**Token tracking**: Add `let totalTokens = 0;` alongside `iterations`. After each `parseAnthropicStream` call, accumulate `totalTokens += result.inputTokens + result.outputTokens`.
 
-### File 2: `src/components/chat/ChatPanel.tsx`
-
-**Track tool sequence count** (~line 372):
-- Add `let toolStepCounter = 0;` alongside `toolCardMap`
-- On each `tool_start` event (line 408), increment `toolStepCounter`
-- Pass `stepInfo` when creating tool cards: `{ current: toolStepCounter, total: 3 }`
-
-**Fix premature clearing** (line 593):
-- Replace `setTimeout(() => setToolCards([]), 500)` with `setTimeout(() => setToolCards([]), 3500)` — waits for the 3000ms collapse delay + 500ms buffer so collapsed badges are visible
-
-**Pass stepInfo in render** (line 858):
-- Change `<ToolProgressCard key={card.id} card={card} />` to also pass `stepInfo` stored on each card
-
-**Storage approach**: Add `stepCurrent` and `stepTotal` fields to the `ToolCard` interface so each card carries its own step info, avoiding prop threading issues. Update the interface, set values on `tool_start`, and after stream ends update all cards' `stepTotal` to the final `toolStepCounter` value.
-
-### Updated ToolCard interface
+**Iteration SSE event**: After each `parseAnthropicStream` completes, emit:
 ```
-export interface ToolCard {
-  id: string;
-  tool: string;
-  inputSummary: string;
-  status: "running" | "done";
-  resultSummary?: string;
-  success?: boolean;
-  stepCurrent?: number;
-  stepTotal?: number;
+sendSSE(controller, "iteration", { current: iterations, max: 5, tool: lastToolName })
+```
+
+**Smart early-exit after tool execution** (after line 1470, before loop continues):
+```typescript
+const CONTENT_TOOLS = ["draft_social_post", "draft_email", "draft_listing_description", "create_file"];
+const lastToolNames = iterationToolCalls.map(t => t.name);
+if (lastToolNames.some(t => CONTENT_TOOLS.includes(t)) && iterationText.trim().length > 50) {
+  break; // Content is ready
 }
 ```
+
+**Consecutive end_turn exit**: Track `let consecutiveEndTurns = 0`. Increment when `stopReason === "end_turn"` and no tool calls, reset to 0 when tools are called. Break if `consecutiveEndTurns >= 2`.
+
+**Cost guard**: After accumulating tokens:
+```typescript
+if (totalTokens > 30000) {
+  fullText += "\n\nI've completed what I could in this response. Want me to continue?";
+  sendSSE(controller, "text_delta", { text: "\n\nI've completed what I could in this response. Want me to continue?" });
+  break;
+}
+```
+
+#### 3. Update all call sites of `parseAnthropicStream`
+- Line 1345: destructure `{ stopReason, inputTokens, outputTokens }` instead of assigning to `stopReason` directly
+- Line 1357: change `if (stopReason === "tool_use"...)` to use the destructured value
+- Accumulate tokens after each call
+
+#### 4. No changes to retry logic
+The 429/529 retry logic (lines 1284-1333) stays exactly as-is.
+
+### Summary of changes
+- Single file edit: `supabase/functions/chat/index.ts`
+- ~30 lines added/modified across the agentic loop and `parseAnthropicStream`
+- Redeploy edge function after changes
 
