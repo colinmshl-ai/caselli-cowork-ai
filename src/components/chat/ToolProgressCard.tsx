@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Home, Pencil, Smartphone, Mail, ClipboardList, User, Check, Loader2, Globe } from "lucide-react";
+import { Home, Pencil, Smartphone, Mail, ClipboardList, User, Check, Loader2, Globe, Search } from "lucide-react";
 
 export interface ToolCard {
   id: string;
@@ -23,6 +23,7 @@ const TOOL_ICONS: Record<string, typeof Home> = {
   add_contact: User,
   update_contact: User,
   web_search: Globe,
+  enrich_property: Search,
 };
 
 const ToolProgressCard = ({ card }: { card: ToolCard }) => {
