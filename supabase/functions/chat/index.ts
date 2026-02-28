@@ -30,6 +30,7 @@ function summarizeToolInput(toolName: string, input: Record<string, unknown>): s
     case "draft_social_post": return `Drafting ${input.post_type || "post"} for ${input.platform || "social"}`;
     case "draft_listing_description": return `Writing listing description`;
     case "create_file": return `Creating ${input.filename || "file"}`;
+    case "enrich_property": return `Looking up property: ${input.address || "property"}`;
     default: return "Working...";
   }
 }
@@ -48,6 +49,14 @@ function summarizeToolResult(toolName: string, result: unknown, taskDescription:
     switch (toolName) {
       case "create_deal": return `Deal created: ${(result as Record<string, unknown>).property_address || ""}`;
       case "add_contact": return `Contact added: ${(result as Record<string, unknown>).full_name || ""}`;
+      case "enrich_property": {
+        const prop = (result as Record<string, unknown>).property;
+        if (prop && typeof prop === "object") {
+          const p = prop as Record<string, unknown>;
+          return `Property: ${p.bedrooms || "?"}bd/${p.bathrooms || "?"}ba, ${p.squareFootage || "?"} sqft, built ${p.yearBuilt || "?"}`;
+        }
+        return taskDescription || "Done";
+      }
       default: return taskDescription || "Done";
     }
   }
@@ -239,6 +248,20 @@ const TOOLS = [
       required: ["filename", "content", "format"],
     },
   },
+  {
+    name: "enrich_property",
+    description: "Look up property details by address using public records. Returns beds, baths, square footage, lot size, year built, property type, last sale price, and photo URLs. Use this whenever a user adds a new listing or asks about property details.",
+    input_schema: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "Full street address" },
+        city: { type: "string", description: "City name" },
+        state: { type: "string", description: "Two-letter state code" },
+        deal_id: { type: "string", description: "Optional deal ID to attach enrichment data to" },
+      },
+      required: ["address", "city", "state"],
+    },
+  },
 ];
 
 interface UndoAction {
@@ -411,8 +434,61 @@ async function executeTool(
         .select()
         .single();
       const price = toolInput.list_price ? ` at $${Number(toolInput.list_price).toLocaleString()}` : "";
+
+      // Auto-enrich property if deal was created successfully
+      let enrichmentResult: Record<string, unknown> | null = null;
+      if (!error && data) {
+        try {
+          // Try to parse city/state from the address
+          const addressStr = toolInput.property_address as string;
+          const parts = addressStr.split(/[,\s]+/).filter(Boolean);
+          // Common pattern: "123 Street Name City ST" or "123 Street, City, ST"
+          const stateMatch = addressStr.match(/\b([A-Z]{2})\b(?:\s*\d{5})?$/);
+          const state = stateMatch?.[1];
+          // City is typically before the state
+          const commaparts = addressStr.split(",").map(s => s.trim());
+          let city = "";
+          if (commaparts.length >= 2) {
+            // "123 Street, City, ST 12345" or "123 Street, City ST"
+            const lastPart = commaparts[commaparts.length - 1];
+            if (lastPart.match(/^[A-Z]{2}/)) {
+              city = commaparts.length >= 3 ? commaparts[commaparts.length - 2] : "";
+            } else {
+              city = commaparts[commaparts.length - 1].replace(/\s*[A-Z]{2}\s*\d{0,5}\s*$/, "").trim();
+            }
+          } else if (state) {
+            // No commas — try to extract city as the word(s) before state
+            const beforeState = addressStr.substring(0, addressStr.lastIndexOf(state)).trim();
+            const words = beforeState.split(/\s+/);
+            // Take last 1-2 words as city (heuristic)
+            city = words.slice(-2).join(" ").replace(/^\d+\s+/, "");
+          }
+
+          if (state && city) {
+            console.log(`[create_deal] Auto-enriching: city="${city}", state="${state}"`);
+            const enrichResult = await executeTool("enrich_property", {
+              address: addressStr,
+              city,
+              state,
+              deal_id: (data as any).id,
+            }, userId, adminClient);
+            enrichmentResult = enrichResult.result as Record<string, unknown>;
+          } else {
+            console.log(`[create_deal] Could not parse city/state from "${addressStr}" — skipping auto-enrichment`);
+          }
+        } catch (enrichErr) {
+          console.error("[create_deal] Auto-enrichment error:", enrichErr);
+          // Non-blocking — deal is still created
+        }
+      }
+
+      const resultWithEnrichment = !error && data ? {
+        ...data,
+        enrichment: enrichmentResult,
+      } : (error ? { error: error.message } : data);
+
       return {
-        result: error ? { error: error.message } : data,
+        result: resultWithEnrichment,
         taskType: "deal_create",
         taskDescription: `New deal added: ${toolInput.property_address}${price}`,
         undoAction: !error && data ? {
@@ -547,6 +623,112 @@ async function executeTool(
         taskDescription: error ? `Failed to update ${contactName}` : `Updated ${contactName}'s ${updatedFields}`,
       };
     }
+    case "enrich_property": {
+      const address = toolInput.address as string;
+      const city = toolInput.city as string;
+      const state = toolInput.state as string;
+      const dealId = toolInput.deal_id as string | undefined;
+
+      console.log(`[enrich_property] Input: address="${address}", city="${city}", state="${state}", deal_id="${dealId || "none"}"`);
+
+      const RENTCAST_API_KEY = Deno.env.get("RENTCAST_API_KEY");
+      if (!RENTCAST_API_KEY) {
+        console.warn("[enrich_property] RENTCAST_API_KEY not configured");
+        return {
+          result: { success: false, error: "Property lookup is not configured. Add a RENTCAST_API_KEY to enable automatic property enrichment." },
+          taskType: "property_enrichment",
+          taskDescription: "Property enrichment unavailable — API key not configured",
+        };
+      }
+
+      try {
+        const url = `https://api.rentcast.io/v1/properties?address=${encodeURIComponent(address)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
+        console.log(`[enrich_property] Calling RentCast: ${url}`);
+        const resp = await fetch(url, { headers: { "X-Api-Key": RENTCAST_API_KEY, "Accept": "application/json" } });
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          console.error(`[enrich_property] RentCast API error ${resp.status}: ${errText}`);
+          return {
+            result: { success: false, error: `Property lookup failed (${resp.status}). The deal was still created with the info you provided.` },
+            taskType: "property_enrichment",
+            taskDescription: `Property lookup failed for ${address}`,
+          };
+        }
+
+        const apiData = await resp.json();
+        console.log(`[enrich_property] RentCast returned ${Array.isArray(apiData) ? apiData.length : 0} results`);
+
+        const property = Array.isArray(apiData) && apiData.length > 0 ? apiData[0] : null;
+        if (!property) {
+          return {
+            result: { success: false, error: "No property records found for this address. The deal was created with the info you provided." },
+            taskType: "property_enrichment",
+            taskDescription: `No property records found for ${address}`,
+          };
+        }
+
+        const enriched = {
+          bedrooms: property.bedrooms ?? null,
+          bathrooms: property.bathrooms ?? null,
+          squareFootage: property.squareFootage ?? null,
+          lotSize: property.lotSize ?? null,
+          yearBuilt: property.yearBuilt ?? null,
+          propertyType: property.propertyType ?? null,
+          lastSalePrice: property.lastSalePrice ?? null,
+          lastSaleDate: property.lastSaleDate ?? null,
+          photos: property.photos || [],
+        };
+
+        // If deal_id provided, update the deal with enrichment data
+        if (dealId) {
+          const updateData: Record<string, unknown> = {
+            bedrooms: enriched.bedrooms,
+            bathrooms: enriched.bathrooms,
+            square_footage: enriched.squareFootage,
+            lot_size: enriched.lotSize,
+            year_built: enriched.yearBuilt,
+            property_type: enriched.propertyType,
+            last_sale_price: enriched.lastSalePrice,
+            last_sale_date: enriched.lastSaleDate,
+            property_photos: enriched.photos.length > 0 ? enriched.photos : null,
+            enrichment_data: property,
+            updated_at: new Date().toISOString(),
+          };
+          const { error: updateError } = await adminClient
+            .from("deals")
+            .update(updateData)
+            .eq("id", dealId)
+            .eq("user_id", userId);
+          if (updateError) {
+            console.error(`[enrich_property] Failed to update deal ${dealId}:`, updateError.message);
+          } else {
+            console.log(`[enrich_property] Updated deal ${dealId} with enrichment data`);
+          }
+        }
+
+        const photoCount = enriched.photos.length;
+        const summary = [
+          enriched.bedrooms ? `${enriched.bedrooms}bd` : null,
+          enriched.bathrooms ? `${enriched.bathrooms}ba` : null,
+          enriched.squareFootage ? `${enriched.squareFootage.toLocaleString()} sqft` : null,
+          enriched.yearBuilt ? `built ${enriched.yearBuilt}` : null,
+        ].filter(Boolean).join(" / ");
+
+        return {
+          result: { success: true, property: enriched, summary, photos_count: photoCount },
+          taskType: "property_enrichment",
+          taskDescription: `Property details: ${summary || address}${photoCount > 0 ? ` • ${photoCount} photos` : ""}`,
+        };
+      } catch (err) {
+        console.error("[enrich_property] Unexpected error:", err);
+        return {
+          result: { success: false, error: "Property lookup encountered an unexpected error. The deal was still created." },
+          taskType: "property_enrichment",
+          taskDescription: `Property lookup error for ${address}`,
+        };
+      }
+    }
     case "create_file": {
       const filename = toolInput.filename as string;
       const content = toolInput.content as string;
@@ -599,6 +781,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   create_todos: "Setting up task list...",
   update_todo: "Updating task...",
   create_file: "Creating file...",
+  enrich_property: "Looking up property details...",
 };
 
 const encoder = new TextEncoder();
@@ -858,6 +1041,15 @@ MULTI-ACTION BEHAVIOR:
 - For simple requests like "draft a post for my listing", just call get_active_deals or get_deal_details and draft_social_post. Two tool calls, done. No todos needed.
 - You have up to 5 tool calls per message. Use them.
 - After completing a chain of actions, summarize everything you did in a clear list.
+
+PROPERTY ENRICHMENT:
+- When a user adds a new listing via create_deal, the system automatically looks up property details (beds, baths, sqft, year built, photos) via the enrich_property tool. This happens within create_deal itself — you do NOT need to call enrich_property separately after creating a deal.
+- If auto-enrichment succeeded, the deal result will include an "enrichment" object with a "property" field. Present the enriched data in your confirmation format, e.g.:
+  ✅ Created listing: [address] - $[price] [type]
+  ✅ Property details: [beds] bed / [baths] bath / [sqft] sqft / Built [year]
+  ✅ [N] property photos saved
+- If auto-enrichment failed or the API key is not configured, still confirm the deal was created and mention that automatic property lookup was not available.
+- If the user asks about a property details and the deal does not have enrichment data yet, use enrich_property with the deal_id to fetch and save the data.
 
 FILE CREATION:
 - When the user asks you to write a report, analysis, or any deliverable, create an actual file using create_file.
