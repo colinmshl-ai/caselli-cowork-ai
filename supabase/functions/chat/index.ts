@@ -795,7 +795,7 @@ async function parseAnthropicStream(
   controller: ReadableStreamDefaultController,
   onText: (text: string) => void,
   onToolUse: (tool: { id: string; name: string; input: Record<string, unknown> }) => void,
-): Promise<"end_turn" | "tool_use"> {
+): Promise<{ stopReason: string; inputTokens: number; outputTokens: number }> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -803,6 +803,8 @@ async function parseAnthropicStream(
   let currentToolName = "";
   let currentToolInput = "";
   let stopReason: "end_turn" | "tool_use" = "end_turn";
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -874,16 +876,25 @@ async function parseAnthropicStream(
           }
           break;
 
+        case "message_start":
+          if (event.message?.usage?.input_tokens) {
+            inputTokens = event.message.usage.input_tokens;
+          }
+          break;
+
         case "message_delta":
           if (event.delta?.stop_reason) {
             stopReason = event.delta.stop_reason;
+          }
+          if (event.usage?.output_tokens) {
+            outputTokens = event.usage.output_tokens;
           }
           break;
       }
     }
   }
 
-  return stopReason;
+  return { stopReason, inputTokens, outputTokens };
 }
 
 Deno.serve(async (req) => {
@@ -1268,11 +1279,13 @@ FILE CREATION:
           const undoActions: UndoAction[] = [];
           let currentMessages = [...apiMessages];
           let iterations = 0;
+          let totalTokens = 0;
+          let consecutiveEndTurns = 0;
           let lastCreatedDealId: string | null = null;
           let lastCreatedContactId: string | null = null;
           let todos: { content: string; active_form: string; status: "pending" | "in_progress" | "completed" }[] = [];
 
-          while (iterations < 3) {
+          while (iterations < 5) {
             if (clientDisconnected) break;
             iterations++;
 
@@ -1342,7 +1355,7 @@ FILE CREATION:
             let iterationText = "";
             const iterationToolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
 
-            const stopReason = await parseAnthropicStream(
+            const streamResult = await parseAnthropicStream(
               anthropicRes,
               controller,
               (text) => {
@@ -1354,7 +1367,23 @@ FILE CREATION:
               },
             );
 
+            const { stopReason, inputTokens, outputTokens } = streamResult;
+            totalTokens += inputTokens + outputTokens;
+
+            // Emit iteration progress to frontend
+            const lastToolName = iterationToolCalls.length > 0 ? iterationToolCalls[iterationToolCalls.length - 1].name : undefined;
+            sendSSE(controller, "iteration", { current: iterations, max: 5, tool: lastToolName });
+
+            // Cost guard
+            if (totalTokens > 30000) {
+              const costMsg = "\n\nI've completed what I could in this response. Want me to continue?";
+              fullText += costMsg;
+              sendSSE(controller, "text_delta", { text: costMsg });
+              break;
+            }
+
             if (stopReason === "tool_use" && iterationToolCalls.length > 0) {
+              consecutiveEndTurns = 0;
               // Build assistant content blocks for the conversation
               const assistantContent: unknown[] = [];
               if (iterationText) {
@@ -1468,9 +1497,18 @@ FILE CREATION:
               }
 
               currentMessages.push({ role: "user", content: toolResults });
+
+              // Smart early-exit: content generation tools with substantial text
+              const CONTENT_TOOLS = ["draft_social_post", "draft_email", "draft_listing_description", "create_file"];
+              const lastToolNames = iterationToolCalls.map(t => t.name);
+              if (lastToolNames.some(t => CONTENT_TOOLS.includes(t)) && iterationText.trim().length > 50) {
+                break; // Content is ready
+              }
               // Loop continues — will make another streaming call
             } else {
-              // end_turn — we're done
+              // end_turn — check consecutive exits
+              consecutiveEndTurns++;
+              if (consecutiveEndTurns >= 2) break;
               break;
             }
           }
