@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, MutableRefObject } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -40,6 +41,7 @@ interface ChatPanelProps {
   onToggleActivity?: () => void;
   showActivity?: boolean;
   onTodosUpdate?: (todos: TodoItem[]) => void;
+  initialConversationId?: string;
 }
 
 const TypingIndicator = ({ status, isSlowResponse }: { status: string; isSlowResponse?: boolean }) => (
@@ -107,10 +109,18 @@ function parseSSEBuffer(buffer: string): [{ event: string; data: string }[], str
   return [events, remaining];
 }
 
-const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext, textareaRef: externalTextareaRef, onToggleActivity, showActivity, onTodosUpdate }: ChatPanelProps) => {
+const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext, textareaRef: externalTextareaRef, onToggleActivity, showActivity, onTodosUpdate, initialConversationId }: ChatPanelProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeConvoId, setActiveConvoId] = useState<string | null>(null);
+  const [, setSearchParams] = useSearchParams();
+  const [activeConvoId, setActiveConvoIdState] = useState<string | null>(initialConversationId || null);
+  const setActiveConvoId = useCallback((id: string | null) => {
+    setActiveConvoIdState(id);
+    setSearchParams((prev) => {
+      if (id) { prev.set("c", id); } else { prev.delete("c"); }
+      return prev;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
   const [typingStatus, setTypingStatus] = useState("");
