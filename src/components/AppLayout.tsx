@@ -2,7 +2,7 @@ import { NavLink, useLocation, Outlet } from "react-router-dom";
 import { MessageSquare, FileText, Users, Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useState } from "react";
+import Chat from "@/pages/Chat";
 
 const navItems = [
   { to: "/chat", icon: MessageSquare, label: "Chat" },
@@ -20,6 +20,8 @@ const AppLayout = () => {
     : user?.email?.charAt(0).toUpperCase() ?? "?";
 
   const isActive = (path: string) => location.pathname === path;
+  const isChat = location.pathname === "/chat";
+  const activeIndex = navItems.findIndex((item) => isActive(item.to));
 
   return (
     <div className="flex h-screen w-full bg-background">
@@ -36,7 +38,7 @@ const AppLayout = () => {
                 <NavLink to={to} className="flex items-center justify-center min-w-[44px] min-h-[44px]" aria-label={label}>
                   <Icon
                     size={20}
-                    className={`transition-all duration-200 ${
+                    className={`transition-colors duration-150 ${
                       isActive(to) ? "text-primary" : "text-muted-foreground hover:text-foreground"
                     }`}
                   />
@@ -65,7 +67,7 @@ const AppLayout = () => {
             <TooltipTrigger asChild>
               <button
                 onClick={signOut}
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] text-muted-foreground hover:text-foreground transition-all duration-200"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] text-muted-foreground hover:text-foreground transition-colors duration-150"
                 aria-label="Sign out"
               >
                 <LogOut size={18} />
@@ -80,11 +82,31 @@ const AppLayout = () => {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0 pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
-        <Outlet />
+        {/* Chat is always mounted, hidden via CSS when not active */}
+        <div className={isChat ? "flex flex-col h-full" : "hidden"}>
+          <Chat />
+        </div>
+
+        {/* Other pages fade in, only rendered when not on /chat */}
+        {!isChat && (
+          <div className="flex flex-col h-full animate-in fade-in duration-200" key={location.pathname}>
+            <Outlet />
+          </div>
+        )}
       </main>
 
       {/* Mobile bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background h-14 pb-safe">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background h-14 pb-safe relative">
+        {/* Sliding active indicator */}
+        {activeIndex >= 0 && (
+          <div
+            className="absolute top-0 h-[2px] bg-primary transition-all duration-200 ease-out"
+            style={{
+              width: `${100 / navItems.length}%`,
+              left: `${(activeIndex * 100) / navItems.length}%`,
+            }}
+          />
+        )}
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -94,12 +116,12 @@ const AppLayout = () => {
           >
             <Icon
               size={20}
-              className={`transition-all duration-200 ${
+              className={`transition-colors duration-150 ${
                 isActive(to) ? "text-primary" : "text-muted-foreground"
               }`}
             />
             <span
-              className={`text-[10px] ${
+              className={`text-[10px] transition-colors duration-150 ${
                 isActive(to) ? "text-primary font-medium" : "text-muted-foreground"
               }`}
             >

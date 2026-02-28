@@ -39,7 +39,7 @@ const App = () => (
               <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
               <Route path="/billing" element={<Billing />} />
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-                <Route path="/chat" element={<Chat />} />
+                <Route path="/chat" element={null} />
                 <Route path="/deals" element={<Deals />} />
                 <Route path="/contacts" element={<Contacts />} />
                 <Route path="/settings" element={<Settings />} />
