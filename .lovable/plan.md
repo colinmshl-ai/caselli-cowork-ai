@@ -1,55 +1,29 @@
 
 
-## Increase Agentic Loop Cap and Add Smart Controls
+## Polish Welcome State and Input Area
 
-### File: `supabase/functions/chat/index.ts`
+### File: `src/components/chat/ChatPanel.tsx`
 
-#### 1. Update `parseAnthropicStream` to return token usage (lines 793-887)
-- Change return type from `Promise<"end_turn" | "tool_use">` to `Promise<{ stopReason: string; inputTokens: number; outputTokens: number }>`
-- Track tokens from `message_start` event (`event.message.usage.input_tokens`) and `message_delta` event (`event.delta.usage?.output_tokens` or `event.usage?.output_tokens`)
-- Return `{ stopReason, inputTokens, outputTokens }` instead of just `stopReason`
+#### 1. Welcome header (lines 747-754)
+Remove "What can I help you with today?" line. Add subtitle "Your AI coworker for real estate".
 
-#### 2. Update the agentic loop (lines 1270-1476)
+#### 2. Starter prompt cards — empty state (lines 755-771)
+Replace grid layout with horizontal flex-wrap pills. Remove icons. Change to 3 prompts:
+- "Add a new listing to my pipeline"
+- "Draft social posts for my active listings"
+- "Review my deadlines this week"
 
-**Cap increase**: Change `while (iterations < 3)` → `while (iterations < 5)` (line 1275)
+Style: `rounded-xl border border-border/60 px-4 py-2.5 text-sm text-foreground hover:bg-secondary/60 hover:border-border hover:scale-[1.02] transition-all cursor-pointer`
 
-**Token tracking**: Add `let totalTokens = 0;` alongside `iterations`. After each `parseAnthropicStream` call, accumulate `totalTokens += result.inputTokens + result.outputTokens`.
+#### 3. Starter prompts below welcome message (lines 839-858)
+Same changes — 3 pills in flex-wrap, no icons, same styling.
 
-**Iteration SSE event**: After each `parseAnthropicStream` completes, emit:
-```
-sendSSE(controller, "iteration", { current: iterations, max: 5, tool: lastToolName })
-```
+#### 4. Input placeholder (line 898)
+Change from `"Ask Caselli Cowork anything..."` to `"Message Caselli..."`.
 
-**Smart early-exit after tool execution** (after line 1470, before loop continues):
-```typescript
-const CONTENT_TOOLS = ["draft_social_post", "draft_email", "draft_listing_description", "create_file"];
-const lastToolNames = iterationToolCalls.map(t => t.name);
-if (lastToolNames.some(t => CONTENT_TOOLS.includes(t)) && iterationText.trim().length > 50) {
-  break; // Content is ready
-}
-```
+#### 5. Keyboard shortcut hint (after line 920, inside the input container)
+Add `<span className="text-[10px] text-muted-foreground/50 self-center ml-1 hidden md:inline">⌘K to focus</span>` next to the input area.
 
-**Consecutive end_turn exit**: Track `let consecutiveEndTurns = 0`. Increment when `stopReason === "end_turn"` and no tool calls, reset to 0 when tools are called. Break if `consecutiveEndTurns >= 2`.
-
-**Cost guard**: After accumulating tokens:
-```typescript
-if (totalTokens > 30000) {
-  fullText += "\n\nI've completed what I could in this response. Want me to continue?";
-  sendSSE(controller, "text_delta", { text: "\n\nI've completed what I could in this response. Want me to continue?" });
-  break;
-}
-```
-
-#### 3. Update all call sites of `parseAnthropicStream`
-- Line 1345: destructure `{ stopReason, inputTokens, outputTokens }` instead of assigning to `stopReason` directly
-- Line 1357: change `if (stopReason === "tool_use"...)` to use the destructured value
-- Accumulate tokens after each call
-
-#### 4. No changes to retry logic
-The 429/529 retry logic (lines 1284-1333) stays exactly as-is.
-
-### Summary of changes
-- Single file edit: `supabase/functions/chat/index.ts`
-- ~30 lines added/modified across the agentic loop and `parseAnthropicStream`
-- Redeploy edge function after changes
+#### 6. Remove unused icon imports
+Remove `Home, Camera, BarChart3, Users` from the lucide import since starter cards no longer use icons.
 
