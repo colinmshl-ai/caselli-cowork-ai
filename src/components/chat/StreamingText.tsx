@@ -10,6 +10,7 @@ interface StreamingTextProps {
 }
 
 const StreamingText = React.memo(({ content }: StreamingTextProps) => {
+  const isEmpty = !content.trim();
   const lastNewline = content.lastIndexOf('\n');
   const stablePrefix = lastNewline > 0 ? content.slice(0, lastNewline) : '';
   const tailLine = lastNewline > 0 ? content.slice(lastNewline + 1) : content;
@@ -21,6 +22,15 @@ const StreamingText = React.memo(({ content }: StreamingTextProps) => {
       ) : null,
     [stablePrefix]
   );
+
+  if (isEmpty) {
+    return (
+      <div className={PROSE_CLASSES}>
+        <span className="text-muted-foreground italic">Generating response...</span>
+        <span className="inline-block w-0.5 h-3.5 bg-primary/50 animate-pulse ml-0.5 align-text-bottom rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className={PROSE_CLASSES}>

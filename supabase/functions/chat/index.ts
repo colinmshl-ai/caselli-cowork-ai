@@ -1458,8 +1458,11 @@ FILE CREATION:
           };
           let contentType = "conversational";
           const toolNames = toolCallLog.map(t => t.tool);
-          // If create_deal + enrich_property both used, prefer property_enriched
-          if (toolNames.includes("create_deal") && toolNames.includes("enrich_property")) {
+
+          // Guard: force conversational if response is too short for a card
+          if (!fullText || fullText.trim().length < 20) {
+            contentType = "conversational";
+          } else if (toolNames.includes("create_deal") && toolNames.includes("enrich_property")) {
             contentType = "property_enriched";
           } else {
             for (const t of toolCallLog) {
@@ -1647,7 +1650,13 @@ FILE CREATION:
         } catch (err) {
           console.error("Streaming error:", err);
           try {
-            sendSSE(controller, "error", { message: `Chat error: ${(err as Error)?.message || 'Unknown error'}` });
+          const errMsg = (err as Error)?.message || 'Unknown error';
+            const userMessage = errMsg.includes("429") || errMsg.includes("rate")
+              ? "I'm being rate limited right now. Please try again in a moment."
+              : errMsg.includes("context") || errMsg.includes("token")
+              ? "The conversation is getting long. Try starting a new chat for this request."
+              : "Something went wrong generating a response. Please try again.";
+            sendSSE(controller, "error", { message: userMessage });
           } catch { /* controller may be closed */ }
           try { controller.close(); } catch { /* already closed */ }
         }
