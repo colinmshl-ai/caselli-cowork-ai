@@ -12,7 +12,7 @@ interface ConversationalRendererProps {
 }
 
 interface Segment {
-  type: "confirmation" | "markdown" | "suggestions" | "closing_question";
+  type: "confirmation" | "markdown" | "suggestions";
   content: string;
   items?: string[];
 }
@@ -25,7 +25,6 @@ function parseConversational(content: string): Segment[] {
   let suggestionsHeader = "";
   const suggestionItems: string[] = [];
   let inSuggestions = false;
-  let closingQuestion = "";
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -40,7 +39,7 @@ function parseConversational(content: string): Segment[] {
     // Detect suggestion header — only match lines clearly offering next-step suggestions
     if (
       !inSuggestions &&
-      /(?:next\s+steps|suggestion|would you like me to|want me to|I can also)\s*.*:/i.test(trimmed)
+      /^(?:next\s+steps|suggestion|would you like me to|want me to|I can also)\s*.*:/i.test(trimmed)
     ) {
       // Flush markdown before suggestions
       if (markdownLines.length > 0) {
@@ -69,21 +68,19 @@ function parseConversational(content: string): Segment[] {
     markdownLines.push(line);
   }
 
-  // Detect closing question: last non-empty markdown line ending with ?
+  // If fewer than 2 suggestion items, treat header + items as regular markdown
+  if (suggestionItems.length < 2 && suggestionsHeader) {
+    markdownLines.push(suggestionsHeader);
+    for (const item of suggestionItems) {
+      markdownLines.push(`- ${item}`);
+    }
+    suggestionItems.length = 0;
+    suggestionsHeader = "";
+  }
+
   const finalMarkdown = markdownLines.join("\n").trim();
   if (finalMarkdown) {
-    const mdLines = finalMarkdown.split("\n");
-    const lastNonEmpty = [...mdLines].reverse().find((l) => l.trim().length > 0);
-    if (lastNonEmpty && lastNonEmpty.trim().endsWith("?")) {
-      closingQuestion = lastNonEmpty.trim();
-      // Remove from markdown
-      const idx = mdLines.lastIndexOf(lastNonEmpty);
-      mdLines.splice(idx, 1);
-      const remaining = mdLines.join("\n").trim();
-      if (remaining) segments.unshift({ type: "markdown", content: remaining });
-    } else {
-      segments.unshift({ type: "markdown", content: finalMarkdown });
-    }
+    segments.unshift({ type: "markdown", content: finalMarkdown });
   }
 
   // Build final segment list in order
@@ -106,11 +103,6 @@ function parseConversational(content: string): Segment[] {
       content: suggestionsHeader,
       items: suggestionItems,
     });
-  }
-
-  // 4. Closing question
-  if (closingQuestion) {
-    result.push({ type: "closing_question", content: closingQuestion });
   }
 
   return result;
@@ -182,15 +174,6 @@ const ConversationalRenderer = React.forwardRef<HTMLDivElement, ConversationalRe
                   ))}
                 </div>
               </div>
-            );
-          case "closing_question":
-            return (
-              <p
-                key={i}
-                className="mt-2 text-sm italic text-muted-foreground border-t border-border/40 pt-2"
-              >
-                {seg.content}
-              </p>
             );
           default:
             return null;
