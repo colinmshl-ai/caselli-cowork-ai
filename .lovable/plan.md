@@ -1,63 +1,58 @@
 
 
-## Smarter Memory Extraction in Chat Edge Function
+## Smooth Page Transitions and Chat State Preservation
 
-### File: `supabase/functions/chat/index.ts`
+### 1. Fade transition on page content — `src/components/AppLayout.tsx`
 
-#### 1. Add cooldown map (top-level, outside handler, ~line 1)
-```typescript
-const lastExtractionMap = new Map<string, number>();
+Wrap `<Outlet />` (line 83) with a keyed fade container:
+
+```tsx
+<div className="animate-in fade-in duration-200" key={location.pathname}>
+  <Outlet />
+</div>
 ```
 
-#### 2. Add helper functions (before the handler, ~line 30)
+But for Chat preservation (point 2), we need a different approach — render all pages simultaneously and hide inactive ones via CSS. This conflicts with a simple keyed fade. The solution: render Chat always, use Outlet for the rest, and apply fade only to non-chat pages.
 
-**Smart filter** replacing the simple length check:
-```typescript
-const shouldExtractMemory = (text: string, toolResults: Array<{tool: string}>): boolean => {
-  if (text.length < 150) return false;
-  const displayOnlyTools = ['get_active_deals', 'get_deal_details', 'check_upcoming_deadlines', 'search_contacts'];
-  const toolsUsed = toolResults.map(t => t.tool);
-  if (toolsUsed.length > 0 && toolsUsed.every(t => displayOnlyTools.includes(t))) return false;
-  const specialCharRatio = (text.match(/[📍📊📅✅$|•\-\d]/g) || []).length / text.length;
-  if (specialCharRatio > 0.15) return false;
-  return true;
-};
-```
+### 2. Preserve Chat state — `src/components/AppLayout.tsx` + `src/App.tsx`
 
-**Word-overlap similarity** for fuzzy dedup:
-```typescript
-const wordSimilarity = (a: string, b: string): number => {
-  const wordsA = new Set(a.toLowerCase().split(/\s+/).filter(w => w.length > 2));
-  const wordsB = new Set(b.toLowerCase().split(/\s+/).filter(w => w.length > 2));
-  if (wordsA.size === 0 || wordsB.size === 0) return 0;
-  let overlap = 0;
-  for (const w of wordsA) { if (wordsB.has(w)) overlap++; }
-  return overlap / Math.max(wordsA.size, wordsB.size);
-};
-```
+**Approach**: Render Chat permanently inside AppLayout (always mounted), hide it with CSS when not on `/chat`. Use `<Outlet />` for the other routes, wrapped in the fade transition.
 
-#### 3. Replace the extraction guard (line 1647)
-Change:
-```typescript
-const shouldExtractMemory = message.length > 20 && toolCallLog.length > 0;
-```
-To:
-```typescript
-const toolResults = toolCallLog.map(t => ({ tool: t.tool || t.name }));
-const doExtract = shouldExtractMemory(assistantContent, toolResults);
-// Cooldown: skip if last extraction < 5 min ago
-const lastExtraction = lastExtractionMap.get(userId) || 0;
-const cooldownOk = Date.now() - lastExtraction > 5 * 60 * 1000;
-```
-Then change `if (shouldExtractMemory)` to `if (doExtract && cooldownOk)` and add `lastExtractionMap.set(userId, Date.now());` at the start of the async block.
+**AppLayout.tsx** changes:
+- Import `Chat` from `@/pages/Chat`
+- Render Chat always: `<div className={location.pathname === "/chat" ? "" : "hidden"}><Chat /></div>`
+- Wrap Outlet in fade div, only show when NOT on `/chat`: `{location.pathname !== "/chat" && <div className="animate-in fade-in duration-200" key={location.pathname}><Outlet /></div>}`
 
-#### 4. Replace exact-match dedup with similarity threshold (lines 1691-1696)
-Change the filter from substring includes to:
-```typescript
-.filter((f: { fact: string }) => {
-  const lower = f.fact.toLowerCase();
-  return !existingTexts.some((existing: string) => wordSimilarity(existing, lower) > 0.8);
-})
-```
-Where `existingTexts` stays as `(existingFacts || []).map(f => f.fact.toLowerCase())`.
+**App.tsx** changes:
+- Remove the `/chat` route from inside the AppLayout route group (line 42), since Chat is now rendered directly by AppLayout.
+
+### 3. Mobile bottom nav active indicator animation — `src/components/AppLayout.tsx`
+
+Add a sliding indicator dot under the active tab:
+- Calculate active tab index from `navItems` based on `location.pathname`
+- Add a positioned container (`relative`) around the mobile nav items
+- Add an absolute-positioned dot/line that uses `transition-all duration-200` and `left` calculated from the active index (`left: calc(${activeIndex} * 25%)` since 4 items = 25% each)
+- Add `transition-colors duration-150` to icon and label classes (already partially there with `transition-all duration-200`)
+
+### 4. Improve Deals skeleton — `src/pages/Deals.tsx`
+
+Update the loading skeleton (lines 164-178) to better match actual deal rows:
+- Each skeleton row should include: address placeholder (w-2/5), client name (w-1/4), a small type badge (w-12), price (w-16), stage badge (w-20 rounded-full), and date (w-16)
+- Match the `px-5 py-3 min-h-[44px]` of actual deal rows
+
+### 5. Improve Contacts skeleton — `src/pages/Contacts.tsx`
+
+Update loading skeleton (lines 181-191) to match contact rows:
+- Name (w-1/3), email (w-1/4), type badge (w-16 rounded-full)
+- Match `px-5 py-3` of actual rows
+
+### 6. Improve Settings skeleton — `src/pages/Settings.tsx`
+
+Already reasonable (lines 150-170). Minor tweak: match the `max-w-2xl` container and section spacing more precisely.
+
+### Files modified:
+- `src/components/AppLayout.tsx` — fade transitions, chat persistence, mobile nav indicator
+- `src/App.tsx` — remove `/chat` child route
+- `src/pages/Deals.tsx` — skeleton refinement
+- `src/pages/Contacts.tsx` — skeleton refinement
 
