@@ -370,6 +370,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         let sourcesFromDone: Source[] | undefined;
         let errorSeen = false;
         const toolCardMap: Record<string, string> = {};
+        let toolStepCounter = 0;
         setToolCards([]);
         let lastEventTime = Date.now();
         lastEventTimeRef.current = lastEventTime;
@@ -411,7 +412,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
                 // Skip tool cards for todo operations - shown in activity panel
                 if (parsed.tool === "create_todos" || parsed.tool === "update_todo") break;
                 const cardId = crypto.randomUUID();
-                setToolCards((prev) => [...prev, { id: cardId, tool: parsed.tool, inputSummary: parsed.input_summary || parsed.status, status: "running" }]);
+                toolStepCounter++;
+                setToolCards((prev) => [...prev, { id: cardId, tool: parsed.tool, inputSummary: parsed.input_summary || parsed.status, status: "running", stepCurrent: toolStepCounter, stepTotal: 3 }]);
                 // Store cardId mapped to tool name for lookup on tool_done
                 toolCardMap[parsed.tool] = cardId;
                 break;
@@ -504,6 +506,10 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         }
         clearInterval(watchdog);
 
+        // Update all tool cards with final step total
+        if (toolStepCounter > 0) {
+          setToolCards((prev) => prev.map((c) => ({ ...c, stepTotal: toolStepCounter })));
+        }
         // If watchdog triggered, show timeout error
         if (watchdogTriggered) {
           errorSeen = true;
@@ -590,7 +596,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       setIsSlowResponse(false);
       abortControllerRef.current = null;
       // Clear tool cards after a delay so collapsed cards are visible briefly
-      setTimeout(() => setToolCards([]), 500);
+      setTimeout(() => setToolCards([]), 3500);
       if (slowTimerRef.current) { clearTimeout(slowTimerRef.current); slowTimerRef.current = null; }
     }
   }, [activeConvoId, user, queryClient, onConversationContext]);
