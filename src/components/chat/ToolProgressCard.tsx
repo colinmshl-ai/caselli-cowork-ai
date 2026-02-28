@@ -8,6 +8,8 @@ export interface ToolCard {
   status: "running" | "done";
   resultSummary?: string;
   success?: boolean;
+  stepCurrent?: number;
+  stepTotal?: number;
 }
 
 const TOOL_ICONS: Record<string, typeof Home> = {
@@ -26,27 +28,20 @@ const TOOL_ICONS: Record<string, typeof Home> = {
   enrich_property: Search,
 };
 
-const ToolProgressCard = ({ card }: { card: ToolCard }) => {
-  const [collapsed, setCollapsed] = useState(false);
+const DEAL_TOOLS = ["get_active_deals", "get_deal_details", "check_upcoming_deadlines", "create_deal", "update_deal"];
+const CONTENT_TOOLS = ["draft_social_post", "draft_email", "draft_listing_description"];
+const CONTACT_TOOLS = ["search_contacts", "add_contact", "update_contact"];
 
-  useEffect(() => {
-    if (card.status === "done") {
-      const t = setTimeout(() => setCollapsed(true), 800);
-      return () => clearTimeout(t);
-    }
-  }, [card.status]);
+function getCategoryBorder(tool: string): string {
+  if (DEAL_TOOLS.includes(tool)) return "border-l-2 border-l-emerald-500";
+  if (CONTENT_TOOLS.includes(tool)) return "border-l-2 border-l-violet-500";
+  if (CONTACT_TOOLS.includes(tool)) return "border-l-2 border-l-blue-500";
+  return "border-l-2 border-l-gray-400";
+}
 
+const ExpandedCard = ({ card }: { card: ToolCard }) => {
   const Icon = TOOL_ICONS[card.tool] || Home;
   const isDone = card.status === "done";
-
-  if (collapsed) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium bg-secondary/50 text-muted-foreground">
-        <Check size={10} className="text-primary" />
-        {card.resultSummary || card.inputSummary}
-      </span>
-    );
-  }
 
   return (
     <div className="rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm px-4 py-3 space-y-1.5 animate-fade-in transition-all duration-300">
@@ -60,7 +55,11 @@ const ToolProgressCard = ({ card }: { card: ToolCard }) => {
             <div className="h-full bg-primary/60 rounded-full animate-pulse" style={{ width: "60%" }} />
           </div>
           <Loader2 size={10} className="text-muted-foreground animate-spin" />
-          <span className="text-[11px] text-muted-foreground">Working...</span>
+          <span className="text-[11px] text-muted-foreground">
+            {card.stepCurrent && card.stepTotal
+              ? `Step ${card.stepCurrent} of ${card.stepTotal} · Working...`
+              : "Working..."}
+          </span>
         </div>
       ) : (
         <div className="flex items-center gap-1.5 text-xs text-primary">
@@ -70,6 +69,41 @@ const ToolProgressCard = ({ card }: { card: ToolCard }) => {
       )}
     </div>
   );
+};
+
+const ToolProgressCard = ({ card }: { card: ToolCard }) => {
+  const [collapsed, setCollapsed] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (card.status === "done") {
+      const t = setTimeout(() => setCollapsed(true), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [card.status]);
+
+  if (collapsed) {
+    if (hovered) {
+      return (
+        <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+          <ExpandedCard card={card} />
+        </div>
+      );
+    }
+
+    return (
+      <span
+        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium bg-secondary/50 text-muted-foreground cursor-pointer ${getCategoryBorder(card.tool)}`}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <Check size={10} className="text-primary" />
+        {card.resultSummary || card.inputSummary}
+      </span>
+    );
+  }
+
+  return <ExpandedCard card={card} />;
 };
 
 export default ToolProgressCard;
