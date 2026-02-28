@@ -1,21 +1,35 @@
 
 
-## Fix ConversationalRenderer: Remove Closing Question Theft + Tighten Suggestion Detection
+## Analysis: Conversation Persistence Already Exists
 
-### Change 1: Remove closing question extraction (lines 14-116)
+The requested feature is **already implemented**. Here's what's in place:
 
-- Remove `"closing_question"` from the `Segment` type union (line 15)
-- Delete `let closingQuestion = ""` (line 28)
-- Replace lines 72-87 (closing question detection) with simple: push all remaining markdown as-is
-- Remove closing question push (lines 111-114)
-- Remove the `case "closing_question"` render block (lines 186-194)
+| Feature | Status | Location |
+|---------|--------|----------|
+| `conversations` table with RLS | Done | DB schema |
+| `messages` table with RLS | Done | DB schema |
+| Save user messages to DB | Done | ChatPanel.tsx:312 |
+| Save assistant messages to DB | Done | Backend edge function |
+| Load messages on mount | Done | ChatPanel.tsx:169-197 |
+| Create conversation on first message | Done | ChatPanel.tsx:297-308 |
+| Conversation history sidebar | Done | ChatPanel.tsx:637-684 |
+| New conversation button | Done | ChatPanel.tsx:603-609 |
+| Store metadata in JSONB column | Done | messages table has `metadata` column |
 
-### Change 2: Stricter suggestion detection (lines 41-67)
+### Only Gap: URL-based conversation ID
 
-- Add `^` anchor to the regex so it only matches lines **starting** with the trigger phrase
-- After collecting suggestion items, check: if fewer than 2 items found, treat the header + items as regular markdown instead of a suggestions section
-- Specifically: after the for-loop ends, if `suggestionItems.length < 2`, push `suggestionsHeader` and the single item back into markdown lines and clear `suggestionItems`
+Currently the conversation ID is only in React state. Adding it to the URL (`/chat?c=uuid`) would allow:
+- Sharing a link to a specific conversation
+- Browser back/forward between conversations
 
-### File modified
-- `src/components/chat/ConversationalRenderer.tsx`
+### Proposed Change (if desired)
+
+**`src/pages/Chat.tsx`**: Read `c` param from URL, pass to ChatPanel as `initialConversationId`
+
+**`src/components/chat/ChatPanel.tsx`**:
+- On `setActiveConvoId`, also update URL via `searchParams.set("c", id)`
+- On mount, if `c` param exists, use it instead of loading most recent conversation
+- On `startNewChat`, clear the `c` param
+
+This is ~15 lines of change across 2 files. No database migration needed.
 
