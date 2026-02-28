@@ -161,18 +161,19 @@ const Deals = () => {
 
       {/* Content */}
       {isLoading ? (
-        <div className="px-5 py-5 space-y-1">
-
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 py-3 border-b border-border">
+        <div className="flex-1 overflow-y-auto">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-3 border-b border-border min-h-[44px]">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-4 w-2/5" />
-                  <Skeleton className="h-3 w-1/4" />
+                  <Skeleton className="h-3.5 w-1/4" />
                 </div>
               </div>
-              <Skeleton className="h-5 w-20 rounded-full" />
-              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-4 w-12 rounded" />
+              <Skeleton className="h-3.5 w-16" />
+              <Skeleton className="h-5 w-20 rounded-lg" />
+              <Skeleton className="h-3.5 w-14" />
             </div>
           ))}
         </div>
