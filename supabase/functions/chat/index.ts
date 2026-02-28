@@ -1385,12 +1385,19 @@ FILE CREATION:
             draft_social_post: "social_post",
             draft_email: "email",
             draft_listing_description: "listing_description",
+            enrich_property: "property_enriched",
           };
           let contentType = "conversational";
-          for (const t of toolCallLog) {
-            if (DRAFT_CONTENT_TYPE_MAP[t.tool]) {
-              contentType = DRAFT_CONTENT_TYPE_MAP[t.tool];
-              break;
+          const toolNames = toolCallLog.map(t => t.tool);
+          // If create_deal + enrich_property both used, prefer property_enriched
+          if (toolNames.includes("create_deal") && toolNames.includes("enrich_property")) {
+            contentType = "property_enriched";
+          } else {
+            for (const t of toolCallLog) {
+              if (DRAFT_CONTENT_TYPE_MAP[t.tool]) {
+                contentType = DRAFT_CONTENT_TYPE_MAP[t.tool];
+                break;
+              }
             }
           }
 

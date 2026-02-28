@@ -4,13 +4,14 @@ import SocialPostCard from "./SocialPostCard";
 import EmailCard from "./EmailCard";
 import ListingCard from "./ListingCard";
 import DealSummaryCard from "./DealSummaryCard";
+import PropertyListingCard from "./PropertyListingCard";
 import ConversationalRenderer from "./ConversationalRenderer";
 import { Separator } from "@/components/ui/separator";
 
 const PROSE_CLASSES =
   "prose prose-sm max-w-none prose-p:my-2 prose-p:leading-relaxed [&>p]:mb-3 prose-ul:my-2 prose-li:my-1 prose-li:leading-relaxed prose-ul:pl-4 prose-headings:my-2 prose-strong:text-foreground prose-a:text-primary text-foreground";
 
-type ContentTypeHint = "social_post" | "email" | "listing_description" | "conversational" | string;
+type ContentTypeHint = "social_post" | "email" | "listing_description" | "conversational" | "property_enriched" | string;
 
 interface ContentCardRendererProps {
   content: string;
@@ -61,12 +62,88 @@ function detectSocial(content: string) {
 }
 
 function detectListing(content: string) {
+  // Don't detect as listing if it's a property enrichment card
+  if (detectPropertyEnriched(content)) return false;
   const lines = content.split("\n");
   // Require property address on its own line (digit + street)
   const hasAddressLine = lines.some(l => /^\*?\*?\d+\s+\w+/.test(l.trim()));
   // Require bed/bath on a separate line
   const hasBedBathLine = lines.some(l => /\bbed/i.test(l) && /\bbath/i.test(l) && /\d/.test(l));
   return hasAddressLine && hasBedBathLine;
+}
+
+function detectPropertyEnriched(content: string) {
+  const hasConfirmation = /✅/.test(content);
+  const hasBedBath = /\bbed/i.test(content) && /\bbath/i.test(content);
+  const hasSqft = /sq\s*ft|square\s*f/i.test(content);
+  return hasConfirmation && hasBedBath && hasSqft;
+}
+
+function parsePropertyEnriched(content: string) {
+  const lines = content.split("\n");
+  let address = "";
+  let price: string | undefined;
+  let bedrooms: number | undefined;
+  let bathrooms: number | undefined;
+  let squareFootage: number | undefined;
+  let yearBuilt: number | undefined;
+  let propertyType: string | undefined;
+  const introLines: string[] = [];
+  let pastCard = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/[*#]+/g, "").replace(/^[-•✅]\s*/, "").trim();
+    if (!line) continue;
+
+    // Address detection: line with digits + street name
+    if (!address && /^\d+\s+\w+/.test(line)) {
+      address = line.split(/[|·—–]/).at(0)?.trim() || line;
+      pastCard = true;
+      continue;
+    }
+
+    // Price
+    const priceMatch = line.match(/\$[\d,]+(?:\.\d+)?/);
+    if (priceMatch && !price) {
+      price = priceMatch[0];
+    }
+
+    // Beds
+    const bedMatch = line.match(/(\d+)\s*bed/i);
+    if (bedMatch) bedrooms = parseInt(bedMatch[1]);
+
+    // Baths
+    const bathMatch = line.match(/([\d.]+)\s*bath/i);
+    if (bathMatch) bathrooms = parseFloat(bathMatch[1]);
+
+    // Sqft
+    const sqftMatch = line.match(/([\d,]+)\s*(?:sq\s*ft|square\s*f)/i);
+    if (sqftMatch) squareFootage = parseInt(sqftMatch[1].replace(/,/g, ""));
+
+    // Year built
+    const yearMatch = line.match(/(?:built|year\s*built)[:\s]*(\d{4})/i) || line.match(/(\d{4})\s*(?:built|construction)/i);
+    if (yearMatch) yearBuilt = parseInt(yearMatch[1]);
+
+    // Property type
+    const typeMatch = line.match(/(?:type|property\s*type)[:\s]*([\w\s]+)/i);
+    if (typeMatch) propertyType = typeMatch[1].trim();
+
+    if (!pastCard && /✅/.test(rawLine)) {
+      pastCard = true;
+    }
+    if (!pastCard) {
+      introLines.push(rawLine);
+    }
+  }
+
+  // Strip trailing suggestions from content
+  const { cleaned, suggestions } = stripTrailingSuggestions(content);
+  let intro = introLines.join("\n").trim();
+  if (suggestions) {
+    intro = intro + (intro ? "\n\n" : "") + suggestions;
+  }
+
+  return { intro, address: address || "Property", price, bedrooms, bathrooms, squareFootage, yearBuilt, propertyType };
 }
 
 function stripTrailingSuggestions(text: string): { cleaned: string; suggestions: string } {
@@ -391,6 +468,28 @@ function renderCardOnly(
       </>
     );
   }
+  if (contentTypeHint === "property_enriched") {
+    const { intro, address, price, bedrooms, bathrooms, squareFootage, yearBuilt, propertyType } = parsePropertyEnriched(section);
+    return (
+      <>
+        {intro && (
+          <div className={PROSE_CLASSES}>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
+        )}
+        <PropertyListingCard
+          address={address}
+          price={price}
+          bedrooms={bedrooms}
+          bathrooms={bathrooms}
+          squareFootage={squareFootage}
+          yearBuilt={yearBuilt}
+          propertyType={propertyType}
+          onAction={onAction}
+        />
+      </>
+    );
+  }
   return (
     <div className={PROSE_CLASSES}>
       <ReactMarkdown remarkPlugins={[remarkBreaks]}>{section}</ReactMarkdown>
@@ -406,7 +505,7 @@ function renderSection(
 ) {
   // For hinted card types, split card content from conversational tail
   if (contentTypeHint && contentTypeHint !== "conversational") {
-    if (contentTypeHint === "email" || contentTypeHint === "social_post" || contentTypeHint === "listing_description") {
+    if (contentTypeHint === "email" || contentTypeHint === "social_post" || contentTypeHint === "listing_description" || contentTypeHint === "property_enriched") {
       const { cardContent, conversationalTail } = splitCardFromConversation(section, contentTypeHint);
       const cardElement = renderCardOnly(cardContent, onAction, contentType, contentTypeHint);
       if (conversationalTail) {
@@ -429,6 +528,40 @@ function renderSection(
   // Fallback: no hint (old messages) — use tightened regex with conversational guard
   if (detectConversational(section)) {
     return <ConversationalRenderer content={section} onAction={onAction} />;
+  }
+
+  // Property enriched fallback (no hint)
+  if (detectPropertyEnriched(section)) {
+    const { cardContent, conversationalTail } = splitCardFromConversation(section, "property_enriched");
+    const { intro, address, price, bedrooms, bathrooms, squareFootage, yearBuilt, propertyType } = parsePropertyEnriched(cardContent);
+    const cardElement = (
+      <>
+        {intro && (
+          <div className={PROSE_CLASSES}>
+            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{intro}</ReactMarkdown>
+          </div>
+        )}
+        <PropertyListingCard
+          address={address}
+          price={price}
+          bedrooms={bedrooms}
+          bathrooms={bathrooms}
+          squareFootage={squareFootage}
+          yearBuilt={yearBuilt}
+          propertyType={propertyType}
+          onAction={onAction}
+        />
+      </>
+    );
+    if (conversationalTail) {
+      return (
+        <>
+          {cardElement}
+          <ConversationalRenderer content={conversationalTail} onAction={onAction} />
+        </>
+      );
+    }
+    return cardElement;
   }
 
   if (detectSocial(section)) {
