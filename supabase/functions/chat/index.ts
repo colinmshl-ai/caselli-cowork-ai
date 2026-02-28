@@ -1258,6 +1258,9 @@ FILE CREATION:
     // Return SSE stream
     const stream = new ReadableStream({
       async start(controller) {
+        let clientDisconnected = false;
+        req.signal.addEventListener("abort", () => { clientDisconnected = true; });
+
         try {
           let fullText = "";
           const toolsUsed: { tool: string; description: string }[] = [];
@@ -1270,6 +1273,7 @@ FILE CREATION:
           let todos: { content: string; active_form: string; status: "pending" | "in_progress" | "completed" }[] = [];
 
           while (iterations < 3) {
+            if (clientDisconnected) break;
             iterations++;
 
             // Retry logic for Anthropic API
@@ -1438,6 +1442,7 @@ FILE CREATION:
               });
 
               const toolOutputs = await Promise.all(toolPromises);
+              if (clientDisconnected) break;
 
               for (const output of toolOutputs) {
                 if (output.undoAction) undoActions.push(output.undoAction);

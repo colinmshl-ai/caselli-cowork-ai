@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, MutableRefObject } from "reac
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, ArrowUp, Clock, Search, Home, Camera, BarChart3, Users, RotateCcw, Activity } from "lucide-react";
+import { Plus, ArrowUp, Clock, Search, Home, Camera, BarChart3, Users, RotateCcw, Activity, Square } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
@@ -124,12 +124,21 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
   
   const [isSlowResponse, setIsSlowResponse] = useState(false);
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const lastEventTimeRef = useRef<number>(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [lastToolUsed, setLastToolUsed] = useState<string | undefined>();
   const [lastTopic, setLastTopic] = useState<string | undefined>();
   const [lastUserMessage, setLastUserMessage] = useState<string>("");
   const [chipContext, setChipContext] = useState<ChipContext>({});
   const [toolCards, setToolCards] = useState<ToolCard[]>([]);
+
+  // Abort in-flight SSE on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
   // Mobile keyboard handling via visualViewport
   useEffect(() => {
     const vv = window.visualViewport;
@@ -317,6 +326,9 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
       const session = (await supabase.auth.getSession()).data.session;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       const response = await fetch(`${supabaseUrl}/functions/v1/chat`, {
         method: "POST",
         headers: {
@@ -325,6 +337,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({ conversation_id: convoId, message: text.trim() }),
+        signal: controller.signal,
       });
 
       const contentType = response.headers.get("content-type") || "";
@@ -348,6 +361,15 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
         let errorSeen = false;
         const toolCardMap: Record<string, string> = {};
         setToolCards([]);
+        let lastEventTime = Date.now();
+        lastEventTimeRef.current = lastEventTime;
+        let watchdogTriggered = false;
+        const watchdog = setInterval(() => {
+          if (Date.now() - lastEventTime > 45000) {
+            watchdogTriggered = true;
+            controller.abort();
+          }
+        }, 5000);
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -357,6 +379,8 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           sseBuffer = remaining;
 
           for (const evt of events) {
+            lastEventTime = Date.now();
+            lastEventTimeRef.current = lastEventTime;
             switch (evt.event) {
               case "text_delta": {
                 const parsed = JSON.parse(evt.data);
@@ -468,6 +492,16 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
             }
           }
         }
+        clearInterval(watchdog);
+
+        // If watchdog triggered, show timeout error
+        if (watchdogTriggered) {
+          errorSeen = true;
+          streamingContentRef.current = "The response was interrupted — no data received for 45 seconds. This can happen during complex multi-step tasks. Please try again.";
+          setMessages((prev) =>
+            prev.map((m) => (m.id === placeholderId ? { ...m, content: streamingContentRef.current, isError: true } : m))
+          );
+        }
 
         // Final content update
         const finalContent = streamingContentRef.current || (errorSeen ? "Something went wrong. Please try again." : "I wasn't able to generate a response.");
@@ -533,13 +567,18 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
           setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: assistantContent }]);
         }
       }
-    } catch (err) {
-      console.error("Chat error:", err);
-      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: "Something went wrong. Please try again." }]);
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        console.log("Stream aborted by user or watchdog");
+      } else {
+        console.error("Chat error:", err);
+        setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: "Something went wrong. Please try again." }]);
+      }
     } finally {
       setTypingStatus("");
       
       setIsSlowResponse(false);
+      abortControllerRef.current = null;
       // Clear tool cards after a delay so collapsed cards are visible briefly
       setTimeout(() => setToolCards([]), 500);
       if (slowTimerRef.current) { clearTimeout(slowTimerRef.current); slowTimerRef.current = null; }
@@ -844,14 +883,24 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
               rows={1}
               className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none max-h-[120px] min-h-[44px] md:min-h-0"
             />
-            <button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim()}
-              className={`flex h-9 w-9 shrink-0 items-center justify-center transition-all duration-200 ${input.trim() ? "text-primary" : "text-muted-foreground"}`}
-              aria-label="Send message"
-            >
-              <ArrowUp size={20} />
-            </button>
+            {typingStatus && Date.now() - lastEventTimeRef.current < 10000 ? (
+              <button
+                onClick={() => abortControllerRef.current?.abort()}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive transition-all duration-200 hover:bg-destructive/20"
+                aria-label="Stop generating"
+              >
+                <Square size={16} />
+              </button>
+            ) : (
+              <button
+                onClick={() => sendMessage(input)}
+                disabled={!input.trim()}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center transition-all duration-200 ${input.trim() ? "text-primary" : "text-muted-foreground"}`}
+                aria-label="Send message"
+              >
+                <ArrowUp size={20} />
+              </button>
+            )}
           </div>
         </div>
       </div>
