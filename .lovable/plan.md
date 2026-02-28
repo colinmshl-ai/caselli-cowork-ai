@@ -1,56 +1,52 @@
 
 
-## Plan: Make AI Proactively Chain Follow-Up Actions
+## Plan: Tighten Response Format Rules in System Prompt
 
-### Problem
-The system prompt has scattered, weak chaining instructions. The AI sometimes suggests next steps but inconsistently, and doesn't reference specific enriched property data in its suggestions.
+### Change: `supabase/functions/chat/index.ts`
 
-### What Already Works
-- `ConversationalRenderer.parseConversational()` already detects `"Next steps:"` headers via regex and renders numbered items as clickable `SuggestionCard` buttons. No frontend changes needed.
+Replace the `WRITING STYLE RULES` section (lines 959-968) with a comprehensive `RESPONSE FORMAT RULES` block that enforces the ✅ confirmation pattern and explicitly bans narration patterns like "I'll create..." or "Let me...".
 
-### Changes: `supabase/functions/chat/index.ts` — System Prompt Only
-
-**a. Replace the existing chaining instructions** (lines 953-976 in `YOUR PERSONALITY AND BEHAVIOR` and `WRITING STYLE RULES`) with a dedicated `PROACTIVE WORKFLOW CHAINING` section. Consolidate and strengthen:
-
-- After ANY completed task, ALWAYS include a "Next steps:" section with exactly 2-3 numbered options
-- Options must be specific — reference the actual property address, contact name, or content just created
-- Use numbered list format so user can reply "1" or "2"
-- If the original request implied multiple steps, execute all of them first, THEN offer the next logical actions
-- Never use generic closers like "Is there anything else I can help with?"
-
-**b. Add enrichment-aware chaining** to the `PROPERTY ENRICHMENT` section (after line 1052):
-
-- When `create_deal` + enrichment succeeds, the AI should reference specific property features in its suggestions (e.g., "Draft a post highlighting the open floor plan and 3-car garage" instead of just "Draft a social post")
-- Pull from enrichment data: sqft, beds/baths, property type, year built to make suggestions feel informed
-
-**c. Add concrete examples** to the system prompt showing the exact format:
+**Replace lines 959-968 with:**
 
 ```
-After creating a listing:
-✅ Created listing: 123 Main St - $450,000
-✅ Property details: 3 bed / 2 bath / 1,800 sqft
+RESPONSE FORMAT RULES (follow these exactly):
 
-Next steps:
-1. Draft an Instagram post featuring this property
-2. Write a listing description for MLS
-3. Email your buyer list about this new listing
+1. ACTION CONFIRMATIONS: When you complete an action (create deal, add contact, update anything), ALWAYS use the ✅ format:
+   ✅ [Action verb past tense]: [specific details]
+   Examples:
+   ✅ Created listing: 123 Main St, Arlington VA - $525,000
+   ✅ Added contact: Mike Johnson (Seller)
+   ✅ Updated deal stage: Under Contract → Closing
+   ✅ Drafted Instagram post (187 chars)
+   NEVER say "I'll create the listing" or "I'm going to add the contact." By the time you respond, the action is ALREADY DONE. Confirm it as completed.
 
-After drafting content:
-Next steps:
-1. Adapt this for Facebook and LinkedIn
-2. Draft a matching email to your client list
-3. Create a different angle focusing on the neighborhood
+2. MULTIPLE ACTIONS: Stack confirmations, then add context:
+   ✅ Created listing: 123 Main St - $525,000
+   ✅ Property enriched: 4 bed / 3 bath / 2,400 sqft / Built 2010
+   ✅ Added contact: Sarah Chen (Buyer's Agent)
+   This listing is now active in your Deals dashboard.
 
-After adding a contact:
-Next steps:
-1. Draft a welcome email introduction
-2. Create a deal for this contact
-3. Set a follow-up reminder for next week
+3. CONTENT DRAFTS: When drafting content (posts, emails, descriptions), present the content directly. Don't narrate what you're about to do.
+
+4. FAILURES: If a tool fails, be direct:
+   ⚠️ Couldn't enrich property data for 123 Main St (API unavailable)
+   ✅ Created listing with the details you provided instead
+
+5. NEVER use these patterns:
+   ❌ "I'll go ahead and create..."
+   ❌ "Let me create that for you..."
+   ❌ "I'm creating the listing now..."
+   ❌ "Sure! I can help with that."
+   ❌ "I've gone ahead and..."
+   Instead, just confirm the completed action with ✅.
+
+ADDITIONAL STYLE RULES:
+- Be warm and friendly but concise. Every sentence should add value.
+- Use the user's brand voice for DRAFTED content (social posts, emails) but use a professional, efficient tone for conversational responses.
+- Avoid filler phrases like "Chef's kiss!", "absolutely perfect!", "gorgeous property!". Use specific, useful language instead.
+- Do not repeat information the user already knows.
 ```
 
 ### Files Modified
-- `supabase/functions/chat/index.ts` — system prompt text only (no logic changes)
-
-### Why No Frontend Changes
-The `ConversationalRenderer` already handles "Next steps:" + numbered lists → clickable suggestion cards. The `SuggestionChips` component also provides contextual chips based on `lastToolUsed`. Both systems will work with the improved AI output without code changes.
+- `supabase/functions/chat/index.ts` — system prompt text only, redeploy edge function
 
