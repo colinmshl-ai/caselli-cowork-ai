@@ -1,42 +1,50 @@
 
 
-## Plan: Robust Error Handling — No Empty Cards
+## Plan: Make AI Proactively Use Web Search for Content Context
 
-### 1. `ContentCardRenderer.tsx` — Minimum content guards
+### Current State
+- `web_search` icon mapping already exists in `ToolProgressCard.tsx` (line 25: `web_search: Globe`) — no frontend changes needed
+- The existing `WEB SEARCH:` section (lines 1051-1056) is passive — it says "use it when the user asks" but doesn't instruct the AI to search automatically before drafting content
 
-Add minimum content length checks before rendering each card type in `renderCardOnly()`:
-- **Email**: body must be ≥ 50 chars, else fall back to markdown
-- **Social post**: postContent must be ≥ 20 chars, else fall back to markdown
-- **Listing**: description must be ≥ 30 chars, else fall back to markdown
-- **Property enriched**: address must not be "Property" (the default fallback) AND at least one stat (beds/baths/sqft) must exist, else fall back to markdown
+### Change: `supabase/functions/chat/index.ts` — System Prompt Only
 
-This extends the existing empty-string checks (lines 413, 433, 453) to also reject too-short content.
+Replace lines 1051-1056 (the current `WEB SEARCH:` section) with an expanded version that adds proactive search behavior:
 
-### 2. `ChatPanel.tsx` — Error message styling + retry
+```
+WEB SEARCH FOR CONTEXT:
+You have access to web_search. Use it PROACTIVELY — don't wait to be asked.
 
-**Lines 727-732**: When rendering an assistant message with `isError: true`, apply a red-tinted background:
-- Add conditional class: `m.isError ? "bg-destructive/5 border border-destructive/20 rounded-xl px-4 py-3" : ""`
+WHEN TO SEARCH AUTOMATICALLY:
+- Before drafting listing content: search "[neighborhood] [city] amenities schools parks restaurants" to add local color
+- Before discussing pricing or market conditions: search "[city] [state] real estate market 2026" or "[zip code] median home price"
+- Before creating social posts about an area: search "upcoming events [city] [month] 2026" or "[neighborhood] things to do"
+- When a user shares a property address and asks you to research it
 
-The retry button already exists (lines 766-774) and works correctly — no change needed there.
+WHEN NOT TO SEARCH:
+- Basic CRUD operations (create deal, add contact, update stage)
+- When you already have all the data you need from deal details and enrichment
+- When the user is asking a simple question you can answer from conversation context
 
-### 3. `StreamingText.tsx` — Empty content fallback
+SEARCH RULES:
+- Use 1-2 focused searches per content request, not 5+ scattered ones
+- Weave search results naturally into your content — don't list raw search results
+- Credit specific data points: "The median home price in Haymarket is $X (source: Realtor.com)"
+- Combine web search results with deal data and enrichment for the most compelling content
+- For market reports, always search for the latest data rather than relying on training data
 
-After the stream completes, the final content update at line 473 already handles empty content with a fallback string. However, `StreamingText` itself (used during streaming) should handle empty/whitespace content gracefully:
-- If `content.trim()` is empty, render a subtle "Generating response..." placeholder instead of a blank div with a cursor
-
-### 4. `supabase/functions/chat/index.ts` — Specific error messages + contentType reset
-
-**Lines 1296-1307** (non-retryable errors): Already has specific messages for 429 and context window errors. These are good. No change needed here.
-
-**Lines 1647-1653** (outer catch): Currently sends raw error message. Improve to send a more user-friendly message.
-
-**Lines 1452-1471** (content type derivation): Add a guard — if `fullText` is empty or too short (< 20 chars), force `contentType = "conversational"` regardless of tools used. This prevents empty card shells when the AI returns a short error-like response after tool use.
-
-**Line 1575** (done event): When sending the done event after an error path, ensure contentType is "conversational".
+EXAMPLE WORKFLOW for "draft an Instagram post for my listing at 123 Main St, Haymarket VA":
+1. get_deal_details → get property features
+2. web_search "Haymarket VA neighborhood highlights amenities 2026" → get local context
+3. Draft the post weaving property features WITH neighborhood highlights
+   Instead of: "Beautiful 4-bed home in a great location!"
+   Write: "4 bed / 3 bath on a quiet cul-de-sac in Haymarket — 5 min from the Saturday farmers market and Old Town restaurants"
+```
 
 ### Files Modified
-- `src/components/chat/ContentCardRenderer.tsx` — min-length guards in `renderCardOnly()`
-- `src/components/chat/ChatPanel.tsx` — error message styling
-- `src/components/chat/StreamingText.tsx` — empty content fallback
-- `supabase/functions/chat/index.ts` — force conversational contentType on short/empty responses
+- `supabase/functions/chat/index.ts` — system prompt text only, redeploy edge function
+
+### What Already Works (No Changes Needed)
+- `ToolProgressCard.tsx` already maps `web_search` → Globe icon
+- Tool progress cards will automatically show "Searching: ..." → "Found X results" based on the existing `inputSummary`/`resultSummary` mechanism
+- `SourcesCard` already renders search result citations at the bottom of messages
 
