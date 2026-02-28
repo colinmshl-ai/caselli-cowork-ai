@@ -21,6 +21,7 @@ const Chat = () => {
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const sendMessageRef = useRef<((msg: string) => void) | null>(null);
   const [conversationContext, setConversationContext] = useState<ConversationContext>({ topic: "general" });
+  const initialConvoId = searchParams.get("c") || undefined;
   const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [showActivity, setShowActivity] = useState(false);
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -61,6 +62,7 @@ const Chat = () => {
         onToggleActivity={() => setShowActivity((p) => !p)}
         showActivity={showActivity}
         onTodosUpdate={setTodos}
+        initialConversationId={initialConvoId}
       />
 
       {showActivity && (
