@@ -1,5 +1,26 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const lastExtractionMap = new Map<string, number>();
+
+const shouldExtractMemoryCheck = (text: string, toolResults: Array<{tool: string}>): boolean => {
+  if (text.length < 150) return false;
+  const displayOnlyTools = ['get_active_deals', 'get_deal_details', 'check_upcoming_deadlines', 'search_contacts'];
+  const toolsUsed = toolResults.map(t => t.tool);
+  if (toolsUsed.length > 0 && toolsUsed.every(t => displayOnlyTools.includes(t))) return false;
+  const specialCharRatio = (text.match(/[📍📊📅✅$|•\-\d]/g) || []).length / text.length;
+  if (specialCharRatio > 0.15) return false;
+  return true;
+};
+
+const wordSimilarity = (a: string, b: string): number => {
+  const wordsA = new Set(a.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+  const wordsB = new Set(b.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  let overlap = 0;
+  for (const w of wordsA) { if (wordsB.has(w)) overlap++; }
+  return overlap / Math.max(wordsA.size, wordsB.size);
+};
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -1642,12 +1663,15 @@ FILE CREATION:
           sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext, content_type: contentType, undo_actions: undoActions.length > 0 ? undoActions : undefined, sources: uniqueSources.length > 0 ? uniqueSources : undefined });
 
 
-          // Background memory extraction (fire and forget)
-          // Only run if user message is substantive and assistant used tools
-          const shouldExtractMemory = message.length > 20 && toolCallLog.length > 0;
-          if (shouldExtractMemory) {
-            const lastMessages = [...history.slice(-3), { role: "user", content: message }, { role: "assistant", content: assistantContent }].slice(-4);
-            (async () => {
+           // Background memory extraction (fire and forget)
+           const toolResults = toolCallLog.map(t => ({ tool: t.tool || t.name }));
+           const doExtract = shouldExtractMemoryCheck(assistantContent, toolResults);
+           const lastExtraction = lastExtractionMap.get(userId) || 0;
+           const cooldownOk = Date.now() - lastExtraction > 5 * 60 * 1000;
+           if (doExtract && cooldownOk) {
+             const lastMessages = [...history.slice(-3), { role: "user", content: message }, { role: "assistant", content: assistantContent }].slice(-4);
+             (async () => {
+               lastExtractionMap.set(userId, Date.now());
               try {
                 const excerpt = lastMessages.map((m) => `${m.role}: ${m.content}`).join("\n\n");
                 const memRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1691,9 +1715,9 @@ FILE CREATION:
                 const rows = facts
                   .filter((f: { fact?: string; category?: string }) => f.fact && f.category)
                   .filter((f: { fact: string }) => {
-                    const lower = f.fact.toLowerCase();
-                    return !existingTexts.some((existing: string) => existing.includes(lower) || lower.includes(existing));
-                  })
+                     const lower = f.fact.toLowerCase();
+                     return !existingTexts.some((existing: string) => wordSimilarity(existing, lower) > 0.8);
+                   })
                   .map((f: { fact: string; category: string }) => ({
                     user_id: userId,
                     fact: f.fact,
