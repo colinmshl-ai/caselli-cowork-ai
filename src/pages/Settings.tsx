@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sun, Moon, Monitor } from "lucide-react";
+import KeyboardShortcutsDialog from "@/components/KeyboardShortcutsDialog";
 
 const SPECIALTIES_OPTIONS = [
   "Residential",
@@ -363,6 +364,11 @@ const Settings = () => {
           >
             Manage Subscription
           </button>
+        </Section>
+
+        {/* Keyboard Shortcuts */}
+        <Section title="Keyboard Shortcuts">
+          <KeyboardShortcutsDialog />
         </Section>
 
         {/* Sign Out */}
