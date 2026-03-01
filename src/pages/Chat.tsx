@@ -20,6 +20,10 @@ const Chat = () => {
   const isMobile = useIsMobile();
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const sendMessageRef = useRef<((msg: string) => void) | null>(null);
+  const newChatRef = useRef<(() => void) | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
+  const lastUserMessageRef = useRef<string>("");
+  const setInputRef = useRef<((val: string) => void) | null>(null);
   const [conversationContext, setConversationContext] = useState<ConversationContext>({ topic: "general" });
   const initialConvoId = searchParams.get("c") || undefined;
   const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -33,14 +37,36 @@ const Chat = () => {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      const mod = e.metaKey || e.ctrlKey;
+
+      if (mod && e.key === "k") {
         e.preventDefault();
         chatTextareaRef.current?.focus();
+        return;
+      }
+      if (mod && e.key === "n") {
+        e.preventDefault();
+        newChatRef.current?.();
+        chatTextareaRef.current?.focus();
+        return;
+      }
+      if (mod && e.key === ".") {
+        e.preventDefault();
+        abortRef.current?.();
+        return;
+      }
+      if (e.key === "Escape") {
+        if (showActivity) {
+          setShowActivity(false);
+        } else {
+          chatTextareaRef.current?.blur();
+        }
+        return;
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [showActivity]);
 
   const handleQuickAction = useCallback((message: string) => {
     setShowActivity(false);
@@ -57,6 +83,10 @@ const Chat = () => {
         pendingPrompt={pendingPrompt}
         onPromptConsumed={() => setPendingPrompt(null)}
         sendMessageRef={sendMessageRef}
+        newChatRef={newChatRef}
+        abortRef={abortRef}
+        lastUserMessageRef={lastUserMessageRef}
+        setInputRef={setInputRef}
         onConversationContext={setConversationContext}
         textareaRef={chatTextareaRef}
         onToggleActivity={() => setShowActivity((p) => !p)}

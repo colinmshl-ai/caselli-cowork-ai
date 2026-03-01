@@ -36,6 +36,10 @@ interface ChatPanelProps {
   pendingPrompt: string | null;
   onPromptConsumed: () => void;
   sendMessageRef: MutableRefObject<((msg: string) => void) | null>;
+  newChatRef?: MutableRefObject<(() => void) | null>;
+  abortRef?: MutableRefObject<(() => void) | null>;
+  lastUserMessageRef?: MutableRefObject<string>;
+  setInputRef?: MutableRefObject<((val: string) => void) | null>;
   onConversationContext?: (ctx: ConversationContext) => void;
   textareaRef?: MutableRefObject<HTMLTextAreaElement | null>;
   onToggleActivity?: () => void;
@@ -109,7 +113,7 @@ function parseSSEBuffer(buffer: string): [{ event: string; data: string }[], str
   return [events, remaining];
 }
 
-const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversationContext, textareaRef: externalTextareaRef, onToggleActivity, showActivity, onTodosUpdate, initialConversationId }: ChatPanelProps) => {
+const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, newChatRef, abortRef, lastUserMessageRef, setInputRef, onConversationContext, textareaRef: externalTextareaRef, onToggleActivity, showActivity, onTodosUpdate, initialConversationId }: ChatPanelProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [, setSearchParams] = useSearchParams();
@@ -605,6 +609,30 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
     sendMessageRef.current = sendMessage;
   }, [sendMessage, sendMessageRef]);
 
+  // newChatRef is set after startNewChat declaration below
+
+  useEffect(() => {
+    if (abortRef) abortRef.current = () => abortControllerRef.current?.abort();
+  }, [abortRef]);
+
+  useEffect(() => {
+    if (lastUserMessageRef) lastUserMessageRef.current = lastUserMessage;
+  }, [lastUserMessageRef, lastUserMessage]);
+
+  useEffect(() => {
+    if (setInputRef) setInputRef.current = (val: string) => {
+      setInput(val);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + "px";
+          }
+        }, 0);
+      }
+    };
+  }, [setInputRef, textareaRef]);
+
   const loadConversation = async (id: string) => {
     setActiveConvoId(id);
     setShowConvos(false);
@@ -616,18 +644,41 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, onConversa
     setMessages(data || []);
   };
 
-  const startNewChat = () => {
+  const startNewChat = useCallback(() => {
     setActiveConvoId(null);
     setMessages([]);
     setShowConvos(false);
     initialized.current = true;
     onConversationContext?.({ topic: "general" });
-  };
+  }, [onConversationContext, setActiveConvoId]);
+
+  // Expose newChatRef after startNewChat is declared
+  useEffect(() => {
+    if (newChatRef) newChatRef.current = startNewChat;
+  }, [newChatRef, startNewChat]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      sendMessage(input);
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage(input);
+      return;
+    }
+    if (e.key === "ArrowUp" && !input.trim() && lastUserMessage) {
+      e.preventDefault();
+      setInput(lastUserMessage);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + "px";
+          }
+        }, 0);
+      }
     }
   };
 
