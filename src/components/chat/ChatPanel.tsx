@@ -792,7 +792,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, newChatRef
       </div>
 
       {/* Messages — centered */}
-      <div className="flex-1 overflow-y-auto px-5 py-5" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight : undefined }}>
+      <div className="flex-1 overflow-y-auto px-5 py-5 pb-24 md:pb-5" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : undefined }}>
         <div className="max-w-2xl mx-auto w-full space-y-6 md:space-y-8">
         {messages.length === 0 && !typingStatus && (
           <div className="flex flex-col items-center justify-center h-full gap-6">
@@ -934,7 +934,7 @@ const ChatPanel = ({ pendingPrompt, onPromptConsumed, sendMessageRef, newChatRef
       )}
 
       {/* Input */}
-      <div className="sticky bottom-0 z-10 bg-background px-5 py-4 border-t border-border">
+      <div className="fixed bottom-14 left-0 right-0 z-10 backdrop-blur-xl bg-background/80 px-5 py-4 border-t border-border/50 pb-safe md:sticky md:bottom-0 md:backdrop-blur-none md:bg-background md:border-t-border md:pb-4">
         <div className="max-w-2xl mx-auto w-full">
           <div className="flex items-end gap-2 rounded-2xl border border-transparent bg-secondary/50 px-5 py-3 transition-all focus-within:border-border focus-within:bg-card shadow-none">
             <span className="text-[10px] text-muted-foreground/50 self-center hidden md:inline select-none">⌘K</span>

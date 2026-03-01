@@ -15,7 +15,7 @@ interface CardActionsProps {
 const TONES = ["Professional", "Casual", "Luxury", "Friendly"];
 
 const CardActions = ({ contentType, onAction }: CardActionsProps) => (
-  <div className="flex items-center gap-1">
+  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1">
     <Button
       variant="ghost"
       size="sm"

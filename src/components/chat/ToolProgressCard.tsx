@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Home, Pencil, Smartphone, Mail, ClipboardList, User, Check, Loader2, Globe, Search } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface ToolCard {
   id: string;
@@ -72,15 +73,20 @@ const ExpandedCard = ({ card }: { card: ToolCard }) => {
 };
 
 const ToolProgressCard = ({ card }: { card: ToolCard }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+  const [collapsed, setCollapsed] = useState(isMobile);
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
+    if (isMobile) {
+      setCollapsed(true);
+      return;
+    }
     if (card.status === "done") {
       const t = setTimeout(() => setCollapsed(true), 3000);
       return () => clearTimeout(t);
     }
-  }, [card.status]);
+  }, [card.status, isMobile]);
 
   if (collapsed) {
     if (hovered) {

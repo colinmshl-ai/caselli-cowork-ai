@@ -26,9 +26,9 @@ const ListingCard = ({ address, stats, description, onAction, contentType }: Lis
       <div className="px-4 py-3">
         <p className="text-sm text-foreground whitespace-pre-wrap">{description}</p>
       </div>
-      <div className="px-4 py-2.5 border-t border-border flex items-center justify-between">
+      <div className="px-4 py-2.5 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">{charCount} chars · {wordCount} words</span>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1">
           {onAction && <CardActions contentType="listing" onAction={onAction} />}
           <CopyButton text={description} />
         </div>

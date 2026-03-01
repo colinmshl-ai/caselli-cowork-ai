@@ -84,7 +84,7 @@ const SocialPostCard = ({ platform, content, onAction, contentType }: SocialPost
               </span>
             )}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1">
             {onAction && (
               <>
                 <Button

@@ -107,14 +107,20 @@ const Chat = () => {
             className={`
               fixed z-50
               ${isMobile
-                ? "inset-x-3 bottom-3 top-auto max-h-[75vh] rounded-2xl"
+                ? "inset-x-3 bottom-16 top-auto max-h-[60vh] rounded-2xl"
                 : "right-4 top-16 bottom-auto w-[340px] max-h-[calc(100vh-5rem)] rounded-2xl"
               }
               border border-border bg-card/95 backdrop-blur-xl shadow-2xl
               flex flex-col overflow-hidden
-              animate-in fade-in slide-in-from-right-3 duration-200
+              animate-in fade-in ${isMobile ? "slide-in-from-bottom-5" : "slide-in-from-right-3"} duration-200
             `}
           >
+            {/* Drag handle on mobile */}
+            {isMobile && (
+              <div className="flex justify-center pt-2 pb-1">
+                <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+              </div>
+            )}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Activity size={14} className="text-muted-foreground" />

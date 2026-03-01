@@ -39,7 +39,7 @@ const EmailCard = ({ to, subject, body, onAction, contentType }: EmailCardProps)
           <span className="text-[11px] text-muted-foreground">
             {charCount} chars · {wordCount} words
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1">
             {onAction && <CardActions contentType="email" onAction={onAction} />}
             <Button
               variant="ghost"
