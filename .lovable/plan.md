@@ -1,58 +1,70 @@
 
 
-## Smooth Page Transitions and Chat State Preservation
+## Fix Content Card Type Detection in ContentCardRenderer
 
-### 1. Fade transition on page content — `src/components/AppLayout.tsx`
+### File: `src/components/chat/ContentCardRenderer.tsx`
 
-Wrap `<Outlet />` (line 83) with a keyed fade container:
+### 1. Replace boolean detectors with confidence-score functions
 
-```tsx
-<div className="animate-in fade-in duration-200" key={location.pathname}>
-  <Outlet />
-</div>
+Replace `detectSocial`, `detectEmail`, `detectDealSummary`, `detectListing`, `detectPropertyEnriched`, and `detectConversational` with versions returning a number 0–1.
+
+**`detectSocialConfidence(content)`** — returns 0–1:
+- Platform keyword must be in first 3 non-empty lines (+0.4)
+- Has hashtags (+0.2)
+- Has "drafted" characteristics: emoji density >1% (+0.1), quotes present (+0.1)
+- Has "Post" or "Caption" header format (+0.2)
+- If platform keyword only appears in conversational phrasing like "I can adapt this for Instagram", return 0
+
+**`detectEmailConfidence(content)`** — returns 0–1:
+- "Subject:" in first 5 non-empty lines (+0.4)
+- "To:" present (+0.15)
+- Has body (≥2 lines after subject) (+0.35)
+- Deduct if also looks social (return 0 if social confidence > 0.5)
+
+**`detectDealSummaryConfidence`**, **`detectPropertyEnrichedConfidence`**, **`detectListingConfidence`**, **`detectConversationalConfidence`** — similar refactors, keeping existing logic but returning weighted scores.
+
+### 2. Restructure `renderSection()` — hint-first, confidence fallback
+
+```
+function renderSection(section, onAction, contentType, contentTypeHint) {
+  // 1. Backend hint takes absolute priority
+  if (contentTypeHint && contentTypeHint !== "conversational") {
+    const card = renderCardOnly(section, onAction, contentType, contentTypeHint);
+    if (card) return card; // hint succeeded
+  }
+  if (contentTypeHint === "conversational") {
+    return <ConversationalRenderer ... />;
+  }
+
+  // 2. Confidence-based fallback (only for old messages without hints)
+  const scores = {
+    conversational: detectConversationalConfidence(section),
+    property_enriched: detectPropertyEnrichedConfidence(section),
+    social_post: detectSocialConfidence(section),
+    email: detectEmailConfidence(section),
+    deal_summary: detectDealSummaryConfidence(section),
+    listing: detectListingConfidence(section),
+  };
+  const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+
+  // Only render as card if confidence > 0.7
+  if (best[1] > 0.7) {
+    // render using existing card+tail splitting logic for best[0] type
+  }
+
+  // 3. Default: conversational markdown
+  return <ConversationalRenderer content={section} onAction={onAction} />;
+}
 ```
 
-But for Chat preservation (point 2), we need a different approach — render all pages simultaneously and hide inactive ones via CSS. This conflicts with a simple keyed fade. The solution: render Chat always, use Outlet for the rest, and apply fade only to non-chat pages.
+### 3. Update `renderCardOnly` signature
 
-### 2. Preserve Chat state — `src/components/AppLayout.tsx` + `src/App.tsx`
+Add the hint as the 4th parameter (already exists), but also accept the section for card+tail splitting inside `renderSection`. The existing `renderCardOnly` already handles all hint types — no signature change needed, just ensure it's called with `splitCardFromConversation` result.
 
-**Approach**: Render Chat permanently inside AppLayout (always mounted), hide it with CSS when not on `/chat`. Use `<Outlet />` for the other routes, wrapped in the fade transition.
+### 4. Fallback always renders conversational markdown
 
-**AppLayout.tsx** changes:
-- Import `Chat` from `@/pages/Chat`
-- Render Chat always: `<div className={location.pathname === "/chat" ? "" : "hidden"}><Chat /></div>`
-- Wrap Outlet in fade div, only show when NOT on `/chat`: `{location.pathname !== "/chat" && <div className="animate-in fade-in duration-200" key={location.pathname}><Outlet /></div>}`
-
-**App.tsx** changes:
-- Remove the `/chat` route from inside the AppLayout route group (line 42), since Chat is now rendered directly by AppLayout.
-
-### 3. Mobile bottom nav active indicator animation — `src/components/AppLayout.tsx`
-
-Add a sliding indicator dot under the active tab:
-- Calculate active tab index from `navItems` based on `location.pathname`
-- Add a positioned container (`relative`) around the mobile nav items
-- Add an absolute-positioned dot/line that uses `transition-all duration-200` and `left` calculated from the active index (`left: calc(${activeIndex} * 25%)` since 4 items = 25% each)
-- Add `transition-colors duration-150` to icon and label classes (already partially there with `transition-all duration-200`)
-
-### 4. Improve Deals skeleton — `src/pages/Deals.tsx`
-
-Update the loading skeleton (lines 164-178) to better match actual deal rows:
-- Each skeleton row should include: address placeholder (w-2/5), client name (w-1/4), a small type badge (w-12), price (w-16), stage badge (w-20 rounded-full), and date (w-16)
-- Match the `px-5 py-3 min-h-[44px]` of actual deal rows
-
-### 5. Improve Contacts skeleton — `src/pages/Contacts.tsx`
-
-Update loading skeleton (lines 181-191) to match contact rows:
-- Name (w-1/3), email (w-1/4), type badge (w-16 rounded-full)
-- Match `px-5 py-3` of actual rows
-
-### 6. Improve Settings skeleton — `src/pages/Settings.tsx`
-
-Already reasonable (lines 150-170). Minor tweak: match the `max-w-2xl` container and section spacing more precisely.
+Change the final fallback (line 710-714) from plain `ReactMarkdown` to `<ConversationalRenderer>` so ambiguous content never gets forced into a card.
 
 ### Files modified:
-- `src/components/AppLayout.tsx` — fade transitions, chat persistence, mobile nav indicator
-- `src/App.tsx` — remove `/chat` child route
-- `src/pages/Deals.tsx` — skeleton refinement
-- `src/pages/Contacts.tsx` — skeleton refinement
+- `src/components/chat/ContentCardRenderer.tsx`
 
