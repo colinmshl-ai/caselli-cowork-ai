@@ -114,12 +114,18 @@ const AppLayout = () => {
             className="flex flex-col items-center justify-center gap-1 min-h-[44px] min-w-[44px] py-1"
             aria-label={label}
           >
-            <Icon
-              size={20}
-              className={`transition-colors duration-150 ${
-                isActive(to) ? "text-primary" : "text-muted-foreground"
+            <span
+              className={`flex items-center justify-center rounded-lg transition-all duration-150 ${
+                isActive(to) ? "bg-primary/10 p-1.5" : "p-1.5"
               }`}
-            />
+            >
+              <Icon
+                size={20}
+                className={`transition-colors duration-150 ${
+                  isActive(to) ? "text-primary" : "text-muted-foreground"
+                }`}
+              />
+            </span>
             <span
               className={`text-[10px] transition-colors duration-150 ${
                 isActive(to) ? "text-primary font-medium" : "text-muted-foreground"
