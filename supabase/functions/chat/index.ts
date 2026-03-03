@@ -7,7 +7,7 @@ const shouldExtractMemoryCheck = (text: string, toolResults: Array<{tool: string
   const displayOnlyTools = ['get_active_deals', 'get_deal_details', 'check_upcoming_deadlines', 'search_contacts'];
   const toolsUsed = toolResults.map(t => t.tool);
   if (toolsUsed.length > 0 && toolsUsed.every(t => displayOnlyTools.includes(t))) return false;
-  const specialCharRatio = (text.match(/[📍📊📅✅$|•\-\d]/g) || []).length / text.length;
+  const specialCharRatio = (text.match(/[📍📊📅✅$|•\-\\d]/g) || []).length / text.length;
   if (specialCharRatio > 0.15) return false;
   return true;
 };
@@ -84,203 +84,249 @@ function summarizeToolResult(toolName: string, result: unknown, taskDescription:
   return taskDescription || "Done";
 }
 
+// Tools in OpenAI function-calling format
 const TOOLS = [
   {
-    name: "get_active_deals",
-    description: "Get all active deals for this agent including property address, client name, stage, and all deadline dates. Use when the agent asks about their deals, pipeline, or workload.",
-    input_schema: { type: "object", properties: {}, required: [] },
+    type: "function" as const,
+    function: {
+      name: "get_active_deals",
+      description: "Get all active deals for this agent including property address, client name, stage, and all deadline dates. Use when the agent asks about their deals, pipeline, or workload.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
   },
   {
-    name: "get_deal_details",
-    description: "Get full details for a specific deal. Use when discussing a specific property or transaction.",
-    input_schema: { type: "object", properties: { deal_id: { type: "string" } }, required: ["deal_id"] },
+    type: "function" as const,
+    function: {
+      name: "get_deal_details",
+      description: "Get full details for a specific deal. Use when discussing a specific property or transaction.",
+      parameters: { type: "object", properties: { deal_id: { type: "string" } }, required: ["deal_id"] },
+    },
   },
   {
-    name: "update_deal",
-    description: "Update a deal's stage, dates, price, or notes. Use when the agent tells you about a status change or updated information.",
-    input_schema: {
-      type: "object",
-      properties: {
-        deal_id: { type: "string" },
-        stage: { type: "string" },
-        closing_date: { type: "string" },
-        inspection_deadline: { type: "string" },
-        financing_deadline: { type: "string" },
-        appraisal_deadline: { type: "string" },
-        contract_price: { type: "number" },
-        notes: { type: "string" },
+    type: "function" as const,
+    function: {
+      name: "update_deal",
+      description: "Update a deal's stage, dates, price, or notes. Use when the agent tells you about a status change or updated information.",
+      parameters: {
+        type: "object",
+        properties: {
+          deal_id: { type: "string" },
+          stage: { type: "string" },
+          closing_date: { type: "string" },
+          inspection_deadline: { type: "string" },
+          financing_deadline: { type: "string" },
+          appraisal_deadline: { type: "string" },
+          contract_price: { type: "number" },
+          notes: { type: "string" },
+        },
+        required: ["deal_id"],
       },
-      required: ["deal_id"],
     },
   },
   {
-    name: "check_upcoming_deadlines",
-    description: "Check for deal deadlines in the next 7 days. Use proactively when the agent asks what to focus on or about their schedule.",
-    input_schema: { type: "object", properties: {}, required: [] },
+    type: "function" as const,
+    function: {
+      name: "check_upcoming_deadlines",
+      description: "Check for deal deadlines in the next 7 days. Use proactively when the agent asks what to focus on or about their schedule.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
   },
   {
-    name: "create_deal",
-    description: "Create a new deal when the agent mentions a new listing, buyer, or transaction. ALWAYS infer deal_type from context: if the agent says 'listing', 'listed', or 'seller' it is a seller deal. If they say 'buyer', 'looking for', or 'making an offer' it is a buyer deal. Default stage to 'lead' for new mentions, 'active_client' if they mention an existing relationship, 'under_contract' if they mention a signed contract. Extract list_price from any dollar amount mentioned.",
-    input_schema: {
-      type: "object",
-      properties: {
-        property_address: { type: "string" },
-        client_name: { type: "string" },
-        client_email: { type: "string" },
-        deal_type: { type: "string", enum: ["buyer", "seller"] },
-        stage: { type: "string" },
-        list_price: { type: "number" },
-        notes: { type: "string" },
+    type: "function" as const,
+    function: {
+      name: "create_deal",
+      description: "Create a new deal when the agent mentions a new listing, buyer, or transaction. ALWAYS infer deal_type from context: if the agent says 'listing', 'listed', or 'seller' it is a seller deal. If they say 'buyer', 'looking for', or 'making an offer' it is a buyer deal. Default stage to 'lead' for new mentions, 'active_client' if they mention an existing relationship, 'under_contract' if they mention a signed contract. Extract list_price from any dollar amount mentioned.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_address: { type: "string" },
+          client_name: { type: "string" },
+          client_email: { type: "string" },
+          deal_type: { type: "string", enum: ["buyer", "seller"] },
+          stage: { type: "string" },
+          list_price: { type: "number" },
+          notes: { type: "string" },
+        },
+        required: ["property_address"],
       },
-      required: ["property_address"],
     },
   },
   {
-    name: "draft_social_post",
-    description: "Draft a social media post. FIRST verify the deal stage matches the post type (new_listing/open_house only for active listings, just_sold only for closed deals). ALWAYS use specific property data (price, beds/baths, sqft, features) from the deal - never write generic posts. Output format: Start with a brief 1-sentence intro, then on a new line write [Platform] Post: as a header, then the post content with 5-8 relevant local hashtags. Do NOT include next steps or suggestions in the post content itself - those go after the post. Keep posts under 200 words. After the post, on separate lines, ask if they want adjustments.",
-    input_schema: {
-      type: "object",
-      properties: {
-        post_type: { type: "string" },
-        property_address: { type: "string" },
-        details: { type: "string" },
-        platform: { type: "string", enum: ["instagram", "facebook", "linkedin"] },
-        deal_id: { type: "string", description: "The deal UUID from get_active_deals" },
+    type: "function" as const,
+    function: {
+      name: "draft_social_post",
+      description: "Draft a social media post. FIRST verify the deal stage matches the post type (new_listing/open_house only for active listings, just_sold only for closed deals). ALWAYS use specific property data (price, beds/baths, sqft, features) from the deal - never write generic posts. Output format: Start with a brief 1-sentence intro, then on a new line write [Platform] Post: as a header, then the post content with 5-8 relevant local hashtags. Do NOT include next steps or suggestions in the post content itself - those go after the post. Keep posts under 200 words. After the post, on separate lines, ask if they want adjustments.",
+      parameters: {
+        type: "object",
+        properties: {
+          post_type: { type: "string" },
+          property_address: { type: "string" },
+          details: { type: "string" },
+          platform: { type: "string", enum: ["instagram", "facebook", "linkedin"] },
+          deal_id: { type: "string", description: "The deal UUID from get_active_deals" },
+        },
+        required: ["post_type"],
       },
-      required: ["post_type"],
     },
   },
   {
-    name: "draft_listing_description",
-    description: "Draft a listing description for MLS or marketing. Follow Fair Housing — property features only. After drafting, ask: 'Want me to adjust anything, or is this good to go?'",
-    input_schema: {
-      type: "object",
-      properties: {
-        property_address: { type: "string" },
-        bedrooms: { type: "number" },
-        bathrooms: { type: "number" },
-        sqft: { type: "number" },
-        features: { type: "string" },
-        style: { type: "string", enum: ["mls_short", "mls_full", "marketing"] },
-        deal_id: { type: "string", description: "The deal UUID from get_active_deals" },
+    type: "function" as const,
+    function: {
+      name: "draft_listing_description",
+      description: "Draft a listing description for MLS or marketing. Follow Fair Housing — property features only. After drafting, ask: 'Want me to adjust anything, or is this good to go?'",
+      parameters: {
+        type: "object",
+        properties: {
+          property_address: { type: "string" },
+          bedrooms: { type: "number" },
+          bathrooms: { type: "number" },
+          sqft: { type: "number" },
+          features: { type: "string" },
+          style: { type: "string", enum: ["mls_short", "mls_full", "marketing"] },
+          deal_id: { type: "string", description: "The deal UUID from get_active_deals" },
+        },
+        required: ["property_address"],
       },
-      required: ["property_address"],
     },
   },
   {
-    name: "draft_email",
-    description: "Draft an email. Before drafting, ALWAYS use search_contacts to look up the recipient and pull their email address. Types: follow_up, check_in, congratulations, introduction, status_update, vendor_coordination. Match brand voice. Include proper email headers (To, Subject) in the output. After drafting, ask: Want me to adjust anything?",
-    input_schema: {
-      type: "object",
-      properties: {
-        email_type: { type: "string" },
-        recipient_name: { type: "string" },
-        recipient_role: { type: "string" },
-        context: { type: "string" },
-        deal_id: { type: "string" },
+    type: "function" as const,
+    function: {
+      name: "draft_email",
+      description: "Draft an email. Before drafting, ALWAYS use search_contacts to look up the recipient and pull their email address. Types: follow_up, check_in, congratulations, introduction, status_update, vendor_coordination. Match brand voice. Include proper email headers (To, Subject) in the output. After drafting, ask: Want me to adjust anything?",
+      parameters: {
+        type: "object",
+        properties: {
+          email_type: { type: "string" },
+          recipient_name: { type: "string" },
+          recipient_role: { type: "string" },
+          context: { type: "string" },
+          deal_id: { type: "string" },
+        },
+        required: ["email_type", "recipient_name"],
       },
-      required: ["email_type", "recipient_name"],
     },
   },
   {
-    name: "search_contacts",
-    description: "Search contacts by name, email, or company. Use this PROACTIVELY before drafting emails or creating deals that mention a person by name. Return all matching results so the AI can reference the correct contact.",
-    input_schema: {
-      type: "object",
-      properties: { query: { type: "string" } },
-      required: ["query"],
-    },
-  },
-  {
-    name: "add_contact",
-    description: "Add a new contact — lead, client, vendor, or other professional.",
-    input_schema: {
-      type: "object",
-      properties: {
-        full_name: { type: "string" },
-        email: { type: "string" },
-        phone: { type: "string" },
-        contact_type: { type: "string", enum: ["client", "lead", "vendor", "agent", "lender", "other"] },
-        company: { type: "string" },
-        notes: { type: "string" },
+    type: "function" as const,
+    function: {
+      name: "search_contacts",
+      description: "Search contacts by name, email, or company. Use this PROACTIVELY before drafting emails or creating deals that mention a person by name. Return all matching results so the AI can reference the correct contact.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string" } },
+        required: ["query"],
       },
-      required: ["full_name"],
     },
   },
   {
-    name: "update_contact",
-    description: "Update an existing contact's information.",
-    input_schema: {
-      type: "object",
-      properties: {
-        contact_id: { type: "string" },
-        email: { type: "string" },
-        phone: { type: "string" },
-        contact_type: { type: "string" },
-        company: { type: "string" },
-        notes: { type: "string" },
+    type: "function" as const,
+    function: {
+      name: "add_contact",
+      description: "Add a new contact — lead, client, vendor, or other professional.",
+      parameters: {
+        type: "object",
+        properties: {
+          full_name: { type: "string" },
+          email: { type: "string" },
+          phone: { type: "string" },
+          contact_type: { type: "string", enum: ["client", "lead", "vendor", "agent", "lender", "other"] },
+          company: { type: "string" },
+          notes: { type: "string" },
+        },
+        required: ["full_name"],
       },
-      required: ["contact_id"],
     },
   },
   {
-    name: "create_todos",
-    description: "Create a task list to track progress on a multi-step request. Use this when the user asks for something that requires 3+ steps. Each item should describe a concrete action you will take.",
-    input_schema: {
-      type: "object",
-      properties: {
-        items: {
-          type: "array",
+    type: "function" as const,
+    function: {
+      name: "update_contact",
+      description: "Update an existing contact's information.",
+      parameters: {
+        type: "object",
+        properties: {
+          contact_id: { type: "string" },
+          email: { type: "string" },
+          phone: { type: "string" },
+          contact_type: { type: "string" },
+          company: { type: "string" },
+          notes: { type: "string" },
+        },
+        required: ["contact_id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_todos",
+      description: "Create a task list to track progress on a multi-step request. Use this when the user asks for something that requires 3+ steps. Each item should describe a concrete action you will take.",
+      parameters: {
+        type: "object",
+        properties: {
           items: {
-            type: "object",
-            properties: {
-              content: { type: "string", description: "What needs to be done" },
-              active_form: { type: "string", description: "Present tense version shown during execution, e.g. 'Searching for market data'" },
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                content: { type: "string", description: "What needs to be done" },
+                active_form: { type: "string", description: "Present tense version shown during execution, e.g. 'Searching for market data'" },
+              },
+              required: ["content", "active_form"],
             },
-            required: ["content", "active_form"],
           },
         },
+        required: ["items"],
       },
-      required: ["items"],
     },
   },
   {
-    name: "update_todo",
-    description: "Update a task's status. Mark as in_progress when starting it, completed when done. Only one task should be in_progress at a time.",
-    input_schema: {
-      type: "object",
-      properties: {
-        index: { type: "number", description: "Zero-based index of the task to update" },
-        status: { type: "string", enum: ["in_progress", "completed"] },
+    type: "function" as const,
+    function: {
+      name: "update_todo",
+      description: "Update a task's status. Mark as in_progress when starting it, completed when done. Only one task should be in_progress at a time.",
+      parameters: {
+        type: "object",
+        properties: {
+          index: { type: "number", description: "Zero-based index of the task to update" },
+          status: { type: "string", enum: ["in_progress", "completed"] },
+        },
+        required: ["index", "status"],
       },
-      required: ["index", "status"],
     },
   },
   {
-    name: "create_file",
-    description: "Create a downloadable file for the user. Use this when the user asks you to write a document, report, spreadsheet export, or any deliverable they'd want to download. Supports markdown, HTML, CSV, and plain text formats.",
-    input_schema: {
-      type: "object",
-      properties: {
-        filename: { type: "string", description: "Filename with extension, e.g. 'market-report.md'" },
-        content: { type: "string", description: "The full content of the file" },
-        format: { type: "string", enum: ["md", "html", "csv", "txt"], description: "File format" },
+    type: "function" as const,
+    function: {
+      name: "create_file",
+      description: "Create a downloadable file for the user. Use this when the user asks you to write a document, report, spreadsheet export, or any deliverable they'd want to download. Supports markdown, HTML, CSV, and plain text formats.",
+      parameters: {
+        type: "object",
+        properties: {
+          filename: { type: "string", description: "Filename with extension, e.g. 'market-report.md'" },
+          content: { type: "string", description: "The full content of the file" },
+          format: { type: "string", enum: ["md", "html", "csv", "txt"], description: "File format" },
+        },
+        required: ["filename", "content", "format"],
       },
-      required: ["filename", "content", "format"],
     },
   },
   {
-    name: "enrich_property",
-    description: "Look up property details by address using public records. Returns beds, baths, square footage, lot size, year built, property type, last sale price, and photo URLs. Use this whenever a user adds a new listing or asks about property details.",
-    input_schema: {
-      type: "object",
-      properties: {
-        address: { type: "string", description: "Full street address" },
-        city: { type: "string", description: "City name" },
-        state: { type: "string", description: "Two-letter state code" },
-        deal_id: { type: "string", description: "Optional deal ID to attach enrichment data to" },
+    type: "function" as const,
+    function: {
+      name: "enrich_property",
+      description: "Look up property details by address using public records. Returns beds, baths, square footage, lot size, year built, property type, last sale price, and photo URLs. Use this whenever a user adds a new listing or asks about property details.",
+      parameters: {
+        type: "object",
+        properties: {
+          address: { type: "string", description: "Full street address" },
+          city: { type: "string", description: "City name" },
+          state: { type: "string", description: "Two-letter state code" },
+          deal_id: { type: "string", description: "Optional deal ID to attach enrichment data to" },
+        },
+        required: ["address", "city", "state"],
       },
-      required: ["address", "city", "state"],
     },
   },
 ];
@@ -331,12 +377,8 @@ async function executeTool(
       for (const [k, v] of Object.entries(updates)) {
         if (v !== undefined && v !== null) cleanUpdates[k] = v;
       }
-
-      // Coerce numeric fields
       if (cleanUpdates.contract_price) cleanUpdates.contract_price = Number(cleanUpdates.contract_price);
       if (cleanUpdates.list_price) cleanUpdates.list_price = Number(cleanUpdates.list_price);
-
-      // Validate stage
       const VALID_STAGES = ["lead", "active_client", "under_contract", "due_diligence", "clear_to_close", "closed", "fell_through"];
       if (cleanUpdates.stage && !VALID_STAGES.includes(cleanUpdates.stage as string)) {
         return {
@@ -345,8 +387,6 @@ async function executeTool(
           taskDescription: `Failed to update deal: invalid stage`,
         };
       }
-
-      // Capture previous values for undo
       const fieldsToCapture = Object.keys(cleanUpdates).filter(k => k !== "updated_at");
       const { data: previousDeal } = await adminClient
         .from("deals")
@@ -354,7 +394,6 @@ async function executeTool(
         .eq("id", deal_id as string)
         .eq("user_id", userId)
         .single();
-
       cleanUpdates.updated_at = new Date().toISOString();
       const { data, error } = await adminClient
         .from("deals")
@@ -363,9 +402,7 @@ async function executeTool(
         .eq("user_id", userId)
         .select()
         .single();
-
       if (error) console.error("update_deal failed:", error.message, { deal_id, cleanUpdates });
-
       if (!data && !error) {
         return {
           result: { error: "Deal not found or no changes applied" },
@@ -373,8 +410,6 @@ async function executeTool(
           taskDescription: `Failed to update deal ${deal_id}`,
         };
       }
-
-      // Build human-friendly update description
       const fieldLabels: Record<string, string> = {
         stage: data?.stage ? `stage to ${(data.stage as string).replace(/_/g, " ")}` : "stage",
         contract_price: data?.contract_price ? `price to $${Number(data.contract_price).toLocaleString()}` : "contract price",
@@ -416,7 +451,6 @@ async function executeTool(
         .select("*")
         .eq("user_id", userId)
         .not("stage", "in", '("closed","fell_through")');
-
       const deadlines: { property: string; deadline_type: string; date: string }[] = [];
       for (const d of deals || []) {
         for (const [field, label] of [
@@ -455,43 +489,30 @@ async function executeTool(
         .select()
         .single();
       const price = toolInput.list_price ? ` at $${Number(toolInput.list_price).toLocaleString()}` : "";
-
-      // Auto-enrich property if deal was created successfully
       let enrichmentResult: Record<string, unknown> | null = null;
       if (!error && data) {
         try {
-          // Try to parse city/state from the address
           const addressStr = toolInput.property_address as string;
-          const parts = addressStr.split(/[,\s]+/).filter(Boolean);
-          // Common pattern: "123 Street Name City ST" or "123 Street, City, ST"
           const stateMatch = addressStr.match(/\b([A-Z]{2})\b(?:\s*\d{5})?$/);
           const state = stateMatch?.[1];
-          // City is typically before the state
           const commaparts = addressStr.split(",").map(s => s.trim());
           let city = "";
           if (commaparts.length >= 2) {
-            // "123 Street, City, ST 12345" or "123 Street, City ST"
             const lastPart = commaparts[commaparts.length - 1];
             if (lastPart.match(/^[A-Z]{2}/)) {
               city = commaparts.length >= 3 ? commaparts[commaparts.length - 2] : "";
             } else {
-              city = commaparts[commaparts.length - 1].replace(/\s*[A-Z]{2}\s*\d{0,5}\s*$/, "").trim();
+              city = commaparts[commaparts.length - 1].replace(/\s*[A-Z]{2}\s*\d{0,5}\s*/, "").trim();
             }
           } else if (state) {
-            // No commas — try to extract city as the word(s) before state
             const beforeState = addressStr.substring(0, addressStr.lastIndexOf(state)).trim();
             const words = beforeState.split(/\s+/);
-            // Take last 1-2 words as city (heuristic)
             city = words.slice(-2).join(" ").replace(/^\d+\s+/, "");
           }
-
           if (state && city) {
             console.log(`[create_deal] Auto-enriching: city="${city}", state="${state}"`);
             const enrichResult = await executeTool("enrich_property", {
-              address: addressStr,
-              city,
-              state,
-              deal_id: (data as any).id,
+              address: addressStr, city, state, deal_id: (data as any).id,
             }, userId, adminClient);
             enrichmentResult = enrichResult.result as Record<string, unknown>;
           } else {
@@ -499,15 +520,9 @@ async function executeTool(
           }
         } catch (enrichErr) {
           console.error("[create_deal] Auto-enrichment error:", enrichErr);
-          // Non-blocking — deal is still created
         }
       }
-
-      const resultWithEnrichment = !error && data ? {
-        ...data,
-        enrichment: enrichmentResult,
-      } : (error ? { error: error.message } : data);
-
+      const resultWithEnrichment = !error && data ? { ...data, enrichment: enrichmentResult } : (error ? { error: error.message } : data);
       return {
         result: resultWithEnrichment,
         taskType: "deal_create",
@@ -524,8 +539,6 @@ async function executeTool(
     case "draft_email": {
       console.log(`[${toolName}] Input:`, JSON.stringify(toolInput));
       let context: Record<string, unknown> = { success: true, ...toolInput };
-      
-      // Try deal_id first, then fall back to address search
       if (toolInput.deal_id) {
         const { data: deal } = await adminClient
           .from("deals")
@@ -553,13 +566,11 @@ async function executeTool(
           console.warn(`[${toolName}] No deal found for address: ${toolInput.property_address}`);
         }
       }
-      
       if (!context.deal) {
         console.warn(`[${toolName}] No deal data available. Input:`, JSON.stringify(toolInput));
         context.no_deal_found = true;
         context.message = "No matching deal found. Draft using available context from the conversation.";
       }
-      // Build human-friendly content description
       const contentLabels: Record<string, string> = {
         draft_social_post: "social post",
         draft_email: "email",
@@ -649,9 +660,7 @@ async function executeTool(
       const city = toolInput.city as string;
       const state = toolInput.state as string;
       const dealId = toolInput.deal_id as string | undefined;
-
       console.log(`[enrich_property] Input: address="${address}", city="${city}", state="${state}", deal_id="${dealId || "none"}"`);
-
       const RENTCAST_API_KEY = Deno.env.get("RENTCAST_API_KEY");
       if (!RENTCAST_API_KEY) {
         console.warn("[enrich_property] RENTCAST_API_KEY not configured");
@@ -661,12 +670,10 @@ async function executeTool(
           taskDescription: "Property enrichment unavailable — API key not configured",
         };
       }
-
       try {
         const url = `https://api.rentcast.io/v1/properties?address=${encodeURIComponent(address)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
         console.log(`[enrich_property] Calling RentCast: ${url}`);
         const resp = await fetch(url, { headers: { "X-Api-Key": RENTCAST_API_KEY, "Accept": "application/json" } });
-
         if (!resp.ok) {
           const errText = await resp.text();
           console.error(`[enrich_property] RentCast API error ${resp.status}: ${errText}`);
@@ -676,10 +683,8 @@ async function executeTool(
             taskDescription: `Property lookup failed for ${address}`,
           };
         }
-
         const apiData = await resp.json();
         console.log(`[enrich_property] RentCast returned ${Array.isArray(apiData) ? apiData.length : 0} results`);
-
         const property = Array.isArray(apiData) && apiData.length > 0 ? apiData[0] : null;
         if (!property) {
           return {
@@ -688,7 +693,6 @@ async function executeTool(
             taskDescription: `No property records found for ${address}`,
           };
         }
-
         const enriched = {
           bedrooms: property.bedrooms ?? null,
           bathrooms: property.bathrooms ?? null,
@@ -700,8 +704,6 @@ async function executeTool(
           lastSaleDate: property.lastSaleDate ?? null,
           photos: property.photos || [],
         };
-
-        // If deal_id provided, update the deal with enrichment data
         if (dealId) {
           const updateData: Record<string, unknown> = {
             bedrooms: enriched.bedrooms,
@@ -727,7 +729,6 @@ async function executeTool(
             console.log(`[enrich_property] Updated deal ${dealId} with enrichment data`);
           }
         }
-
         const photoCount = enriched.photos.length;
         const summary = [
           enriched.bedrooms ? `${enriched.bedrooms}bd` : null,
@@ -735,7 +736,6 @@ async function executeTool(
           enriched.squareFootage ? `${enriched.squareFootage.toLocaleString()} sqft` : null,
           enriched.yearBuilt ? `built ${enriched.yearBuilt}` : null,
         ].filter(Boolean).join(" / ");
-
         return {
           result: { success: true, property: enriched, summary, photos_count: photoCount },
           taskType: "property_enrichment",
@@ -755,22 +755,18 @@ async function executeTool(
       const content = toolInput.content as string;
       const format = toolInput.format as string;
       const storagePath = `${userId}/${filename}`;
-
       const { error: uploadError } = await adminClient.storage
         .from("user-files")
         .upload(storagePath, new Blob([content], { type: getMimeType(format) }), {
           contentType: getMimeType(format),
           upsert: true,
         });
-
       if (uploadError) {
         return { result: { error: uploadError.message }, taskType: "file_creation", taskDescription: `Failed to create ${filename}` };
       }
-
       const { data: signedUrl } = await adminClient.storage
         .from("user-files")
         .createSignedUrl(storagePath, 86400);
-
       return {
         result: { filename, url: signedUrl?.signedUrl, format, size: content.length },
         taskType: "file_creation",
@@ -779,7 +775,6 @@ async function executeTool(
     }
     case "create_todos":
     case "update_todo":
-      // Handled inline in the agentic loop, not here
       return { result: { success: true }, taskType: "todo", taskDescription: "Task list updated" };
     default:
       return { result: { error: "Unknown tool" }, taskType: "unknown", taskDescription: "Unknown tool called" };
@@ -798,7 +793,6 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   search_contacts: "Searching your contacts...",
   add_contact: "Adding a new contact...",
   update_contact: "Updating contact info...",
-  web_search: "Searching the web...",
   create_todos: "Setting up task list...",
   update_todo: "Updating task...",
   create_file: "Creating file...",
@@ -811,111 +805,141 @@ function sendSSE(controller: ReadableStreamDefaultController, event: string, dat
   controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
 }
 
-async function parseAnthropicStream(
+// OpenAI-compatible SSE stream parser for Lovable AI Gateway
+interface OpenAIToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+async function parseOpenAIStream(
   response: Response,
   controller: ReadableStreamDefaultController,
   onText: (text: string) => void,
-  onToolUse: (tool: { id: string; name: string; input: Record<string, unknown> }) => void,
-): Promise<{ stopReason: string; inputTokens: number; outputTokens: number }> {
+  onToolUse: (tool: OpenAIToolCall) => void,
+): Promise<{ stopReason: string }> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let currentToolId = "";
-  let currentToolName = "";
-  let currentToolInput = "";
-  let stopReason: "end_turn" | "tool_use" = "end_turn";
-  let inputTokens = 0;
-  let outputTokens = 0;
+  let stopReason = "stop";
+
+  // Accumulate tool calls by index
+  const toolCallAccumulators: Map<number, { id: string; name: string; arguments: string }> = new Map();
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-
     buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
 
-    for (const line of lines) {
+    let newlineIndex: number;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      let line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (line.startsWith(":") || line.trim() === "") continue;
       if (!line.startsWith("data: ")) continue;
-      const jsonStr = line.slice(6);
-      if (jsonStr === "[DONE]") continue;
 
-      let event;
-      try {
-        event = JSON.parse(jsonStr);
-      } catch {
-        continue;
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === "[DONE]") {
+        // Flush any accumulated tool calls
+        for (const [, acc] of toolCallAccumulators) {
+          try {
+            const parsed = JSON.parse(acc.arguments || "{}");
+            onToolUse({ id: acc.id, name: acc.name, input: parsed });
+          } catch {
+            console.error("Failed to parse tool call arguments:", acc.arguments);
+            onToolUse({ id: acc.id, name: acc.name, input: {} });
+          }
+        }
+        break;
       }
 
-      switch (event.type) {
-        case "content_block_start":
-          if (event.content_block?.type === "tool_use") {
-            currentToolId = event.content_block.id;
-            currentToolName = event.content_block.name;
-            currentToolInput = "";
-          } else if (event.content_block?.type === "web_search_tool_result") {
-            // Server-side web search completed — collect sources and stream to frontend
-            const searchResults = event.content_block.search_results || [];
-            const collectedSources = searchResults.map((r: { title?: string; url?: string }) => {
-              const url = r.url || "";
-              let domain = "";
-              try { domain = new URL(url).hostname.replace("www.", ""); } catch { /* ignore */ }
-              return { title: r.title || url, url, domain };
-            }).filter((s: { url: string }) => s.url);
-            // Store sources on the function-level for the done event
-            if (typeof (controller as any).__sources === "undefined") (controller as any).__sources = [];
-            (controller as any).__sources.push(...collectedSources);
-            const sourceNames = collectedSources.map((s: { title: string }) => s.title).slice(0, 5);
-            sendSSE(controller, "web_search_result", {
-              query: event.content_block.content?.query || "",
-              results_count: searchResults.length,
-              sources: sourceNames,
-            });
-          }
-          break;
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const choice = parsed.choices?.[0];
+        if (!choice) continue;
 
-        case "content_block_delta":
-          if (event.delta?.type === "text_delta") {
-            const text = event.delta.text;
-            onText(text);
-            sendSSE(controller, "text_delta", { text });
-          } else if (event.delta?.type === "input_json_delta") {
-            currentToolInput += event.delta.partial_json;
+        // Check finish_reason
+        if (choice.finish_reason) {
+          stopReason = choice.finish_reason;
+          // If tool_calls, flush accumulators
+          if (stopReason === "tool_calls") {
+            for (const [, acc] of toolCallAccumulators) {
+              try {
+                const parsedArgs = JSON.parse(acc.arguments || "{}");
+                onToolUse({ id: acc.id, name: acc.name, input: parsedArgs });
+              } catch {
+                console.error("Failed to parse tool call arguments:", acc.arguments);
+                onToolUse({ id: acc.id, name: acc.name, input: {} });
+              }
+            }
+            toolCallAccumulators.clear();
           }
-          break;
+        }
 
-        case "content_block_stop":
-          if (currentToolId) {
-            let parsedInput: Record<string, unknown> = {};
-            try {
-              if (currentToolInput) parsedInput = JSON.parse(currentToolInput);
-            } catch { /* empty input */ }
-            onToolUse({ id: currentToolId, name: currentToolName, input: parsedInput });
-            currentToolId = "";
-            currentToolName = "";
-            currentToolInput = "";
-          }
-          break;
+        const delta = choice.delta;
+        if (!delta) continue;
 
-        case "message_start":
-          if (event.message?.usage?.input_tokens) {
-            inputTokens = event.message.usage.input_tokens;
-          }
-          break;
+        // Text content
+        if (delta.content) {
+          onText(delta.content);
+          sendSSE(controller, "text_delta", { text: delta.content });
+        }
 
-        case "message_delta":
-          if (event.delta?.stop_reason) {
-            stopReason = event.delta.stop_reason;
+        // Tool calls (streamed incrementally)
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? 0;
+            if (!toolCallAccumulators.has(idx)) {
+              toolCallAccumulators.set(idx, {
+                id: tc.id || `call_${idx}_${Date.now()}`,
+                name: tc.function?.name || "",
+                arguments: "",
+              });
+            }
+            const acc = toolCallAccumulators.get(idx)!;
+            if (tc.id) acc.id = tc.id;
+            if (tc.function?.name) acc.name = tc.function.name;
+            if (tc.function?.arguments) acc.arguments += tc.function.arguments;
           }
-          if (event.usage?.output_tokens) {
-            outputTokens = event.usage.output_tokens;
-          }
-          break;
+        }
+      } catch {
+        // Incomplete JSON — put it back
+        buffer = line + "\n" + buffer;
+        break;
       }
     }
   }
 
-  return { stopReason, inputTokens, outputTokens };
+  return { stopReason };
+}
+
+// Non-streaming gateway call for title generation and memory extraction
+async function gatewayCall(
+  apiKey: string,
+  messages: { role: string; content: string }[],
+  maxTokens: number = 256,
+): Promise<string> {
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages,
+      max_tokens: maxTokens,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Gateway call error:", res.status, errText);
+    return "";
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || "";
 }
 
 Deno.serve(async (req) => {
@@ -976,8 +1000,7 @@ Deno.serve(async (req) => {
     const recentActivity = recentActivityRes.data || [];
     const lastConvo = lastConvoRes.data?.[0];
 
-    // === SYSTEM PROMPT: Split into static (cacheable) + profile (cacheable) + dynamic (not cached) ===
-
+    // === SYSTEM PROMPT ===
     const STATIC_SYSTEM_PROMPT = `You are Caselli, a sharp, proactive real estate AI coworker. You anticipate needs, not just respond to requests. When an agent mentions a listing, you automatically think about what marketing materials they'll need, what deadlines to track, and who to notify. You speak in the agent's chosen brand tone at all times.
 
 YOUR PERSONALITY AND BEHAVIOR:
@@ -1074,42 +1097,13 @@ CONTENT DRAFTING QUALITY RULES:
 - When drafting social posts, emails, or listing descriptions, write like a real agent would. No corporate marketing speak.
 - NEVER use these phrases in drafted content: "Don't miss out", "Mark your calendars", "Your dream home awaits", "This won't last long", "Act now", "Stunning", "Breathtaking", "One-of-a-kind"
 - Social posts should feel authentic and local. Reference the specific neighborhood, not generic "amazing location" language.
-- If the deal data includes specific features (sqft, beds, baths, price), USE THEM in the post. Don't write vague posts when you have real data.
 - Open house posts must include: address, date/time (ask if not provided), 2-3 specific property highlights from deal data, and relevant hashtags including the city/neighborhood.
 - If you don't have enough data to write a good post (no features, no price, no neighborhood), say so and ask for the missing details instead of writing a generic post.
 - Keep social posts to 150-200 words max. Quality over quantity.
 - Emails should be short and direct. No more than 3 short paragraphs.
 
-WEB SEARCH FOR CONTEXT:
-You have access to web_search. Use it PROACTIVELY — don't wait to be asked.
-
-WHEN TO SEARCH AUTOMATICALLY:
-- Before drafting listing content: search "[neighborhood] [city] amenities schools parks restaurants" to add local color
-- Before discussing pricing or market conditions: search "[city] [state] real estate market 2026" or "[zip code] median home price"
-- Before creating social posts about an area: search "upcoming events [city] [month] 2026" or "[neighborhood] things to do"
-- When a user shares a property address and asks you to research it
-
-WHEN NOT TO SEARCH:
-- Basic CRUD operations (create deal, add contact, update stage)
-- When you already have all the data you need from deal details and enrichment
-- When the user is asking a simple question you can answer from conversation context
-
-SEARCH RULES:
-- Use 1-2 focused searches per content request, not 5+ scattered ones
-- Weave search results naturally into your content — don't list raw search results
-- Credit specific data points: "The median home price in Haymarket is $X (source: Realtor.com)"
-- Combine web search results with deal data and enrichment for the most compelling content
-- For market reports, always search for the latest data rather than relying on training data
-
-EXAMPLE WORKFLOW for "draft an Instagram post for my listing at 123 Main St, Haymarket VA":
-1. get_deal_details → get property features
-2. web_search "Haymarket VA neighborhood highlights amenities 2026" → get local context
-3. Draft the post weaving property features WITH neighborhood highlights
-   Instead of: "Beautiful 4-bed home in a great location!"
-   Write: "4 bed / 3 bath on a quiet cul-de-sac in Haymarket — 5 min from the Saturday farmers market and Old Town restaurants"
-
 YOUR CAPABILITIES AND HOW TO USE THEM:
-- You have tools to manage deals, contacts, draft content, and search the web. USE THEM PROACTIVELY.
+- You have tools to manage deals, contacts, draft content. USE THEM PROACTIVELY.
 - When the agent mentions a person by name, automatically search contacts to see if they exist before asking.
 - When the agent mentions a property address, check if there is already a deal for it.
 - When creating a deal, also offer to add the client as a contact if they are not already in the system.
@@ -1143,7 +1137,7 @@ Before using draft_social_post, draft_email, or draft_listing_description for a 
 If the user insists after the warning, proceed with the draft.
 
 TASK TRACKING:
-- ONLY create a task list for genuinely complex multi-step requests (5+ steps involving different tools).
+- ONLY create a task list for genuinely complex multi-step requests (5+ steps involving different tools). 
 - Do NOT create todos for simple requests like "draft a social post" or "update this deal" — just do it.
 - Simple flows like: look up deal → draft content → suggest next steps do NOT need task tracking.
 - Examples that DO need todos: "Set up everything for my new listing" (create deal + add contact + draft social post + draft email + check deadlines).
@@ -1166,14 +1160,8 @@ PROPERTY ENRICHMENT:
   ✅ [N] property photos saved
 - If auto-enrichment failed or the API key is not configured, still confirm the deal was created and mention that automatic property lookup was not available.
 - If the user asks about a property details and the deal does not have enrichment data yet, use enrich_property with the deal_id to fetch and save the data.
-- ENRICHMENT-AWARE CHAINING: When create_deal + enrichment succeeds, you have rich property data. USE IT in your follow-up suggestions. Don't offer generic "Draft a social post" — instead reference specific features from the enrichment data. Examples:
-  - If the property has 4+ bedrooms: "Draft a post highlighting the spacious 4-bedroom layout"
-  - If the property has large sqft: "Write a listing description showcasing the 3,200 sqft of living space"
-  - If the property was recently built: "Draft a post featuring this newer construction (built 2021)"
-  - If the property has multiple photos: "Create an Instagram carousel post using the 12 property photos"
-  Pull from enrichment data (sqft, beds/baths, property type, year built, lot size, photos count) to make every suggestion feel informed and specific to THIS property.
-
-FILE CREATION:
+- ENRICHMENT-AWARE CHAINING: When create_deal + enrichment succeeds, you have rich property data. USE IT in your follow-up suggestions.
+- FILE CREATION:
 - When the user asks you to write a report, analysis, or any deliverable, create an actual file using create_file.
 - Don't just output long content as chat text. Create a downloadable file instead.
 - Use markdown format by default for reports and analyses.
@@ -1181,7 +1169,7 @@ FILE CREATION:
 - Use HTML for formatted content that needs styling.
 - Always mention the filename when you create a file.`;
 
-    // Build profile context block (cacheable — changes rarely)
+    // Build profile context block
     let profileContext = "";
     if (profile) {
       const fields: [string, string | null | undefined][] = [
@@ -1199,71 +1187,34 @@ FILE CREATION:
       ];
       const agentLines = fields.filter(([, v]) => v && v.trim()).map(([l, v]) => `${l}: ${v}`);
       if (agentLines.length > 0) {
-        profileContext = `ABOUT THE AGENT YOU WORK WITH:\n${agentLines.join("\n")}`;
+        profileContext = `\n\nABOUT THE AGENT YOU WORK WITH:\n${agentLines.join("\n")}`;
       }
     }
 
-    // Build dynamic context block (changes every request — NOT cached)
+    // Build dynamic context block
     let dynamicContext = "";
     if (memoryFacts.length > 0) {
-      dynamicContext += `THINGS I REMEMBER FROM PAST CONVERSATIONS:\n${memoryFacts.map((m) => `- ${m.fact}`).join("\n")}\n\n`;
+      dynamicContext += `\n\nTHINGS I REMEMBER FROM PAST CONVERSATIONS:\n${memoryFacts.map((m) => `- ${m.fact}`).join("\n")}`;
     }
     if (recentActivity.length > 0) {
-      dynamicContext += `RECENT ACTIVITY (last actions across all conversations):\n`;
+      dynamicContext += `\n\nRECENT ACTIVITY (last actions across all conversations):\n`;
       for (const activity of recentActivity) {
         const meta = activity.metadata as Record<string, unknown> | null;
         const toolName = meta?.tool || activity.task_type;
         const inputSummary = meta?.input ? Object.entries(meta.input as Record<string, unknown>).filter(([, v]) => v).map(([k, v]) => `${k}="${v}"`).join(", ") : "";
         dynamicContext += `- ${activity.description || toolName}${inputSummary ? ` (${inputSummary})` : ""}\n`;
       }
-      dynamicContext += `\n`;
     }
     if (lastConvo && lastConvo.id !== conversation_id && lastConvo.title) {
-      dynamicContext += `LAST CONVERSATION CONTEXT: The user's most recent conversation was titled "${lastConvo.title}". Reference this naturally if relevant.\n\n`;
+      dynamicContext += `\n\nLAST CONVERSATION CONTEXT: The user's most recent conversation was titled "${lastConvo.title}". Reference this naturally if relevant.`;
     }
 
-    // Structure system prompt as array of content blocks for prompt caching
-    const systemContent: { type: string; text: string; cache_control?: { type: string } }[] = [
-      {
-        type: "text",
-        text: STATIC_SYSTEM_PROMPT,
-        cache_control: { type: "ephemeral" },
-      },
-    ];
-    if (profileContext) {
-      systemContent.push({
-        type: "text",
-        text: profileContext,
-        cache_control: { type: "ephemeral" },
-      });
-    }
-    if (dynamicContext) {
-      systemContent.push({
-        type: "text",
-        text: dynamicContext,
-      });
-    }
+    // Build system message (single string for OpenAI format)
+    const systemMessage = STATIC_SYSTEM_PROMPT + profileContext + dynamicContext;
 
-    // Build tools array with cache_control on the last tool
-    const toolDefs = TOOLS.map(t => ({
-      name: t.name,
-      description: t.description,
-      input_schema: t.input_schema,
-    }));
-    const toolsWithCache = [
-      {
-        type: "web_search_20250305",
-        name: "web_search",
-        max_uses: 5,
-      },
-      ...toolDefs.slice(0, -1),
-      {
-        ...toolDefs[toolDefs.length - 1],
-        cache_control: { type: "ephemeral" },
-      },
-    ];
-
-    const apiMessages = [
+    // Build API messages (OpenAI format)
+    const apiMessages: { role: string; content: string }[] = [
+      { role: "system", content: systemMessage },
       ...history.map((m: { role: string; content: string; metadata?: { tools?: { tool: string; input: Record<string, unknown>; result_summary?: string }[] } }) => {
         let content = m.content;
         if (m.role === "assistant" && m.metadata?.tools) {
@@ -1279,9 +1230,9 @@ FILE CREATION:
       { role: "user", content: message },
     ];
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
-      return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -1298,9 +1249,10 @@ FILE CREATION:
           const toolsUsed: { tool: string; description: string }[] = [];
           const toolCallLog: { tool: string; input: Record<string, unknown>; result: unknown }[] = [];
           const undoActions: UndoAction[] = [];
-          let currentMessages = [...apiMessages];
+          // For the agent loop, we track messages WITHOUT the system message
+          // (system message is always prepended in the API call)
+          let currentMessages = apiMessages.slice(1); // remove system message
           let iterations = 0;
-          let totalTokens = 0;
           let consecutiveEndTurns = 0;
           let lastCreatedDealId: string | null = null;
           let lastCreatedContactId: string | null = null;
@@ -1310,44 +1262,45 @@ FILE CREATION:
             if (clientDisconnected) break;
             iterations++;
 
-            // Retry logic for Anthropic API
-            let anthropicRes: Response | null = null;
+            // Call Lovable AI Gateway
+            let gatewayRes: Response | null = null;
             let retryCount = 0;
             const maxRetries = 2;
 
             while (retryCount <= maxRetries) {
-              anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+              gatewayRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                 method: "POST",
                 headers: {
-                  "x-api-key": ANTHROPIC_API_KEY,
-                  "anthropic-version": "2023-06-01",
-                  "content-type": "application/json",
+                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                  "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  model: "claude-sonnet-4-20250514",
-                  system: systemContent,
-                  messages: currentMessages,
-                  tools: toolsWithCache,
+                  model: "google/gemini-2.5-flash",
+                  messages: [
+                    { role: "system", content: systemMessage },
+                    ...currentMessages,
+                  ],
+                  tools: TOOLS,
                   max_tokens: 4096,
                   stream: true,
                 }),
               });
 
-              if (anthropicRes.ok) break;
+              if (gatewayRes.ok) break;
 
-              const errText = await anthropicRes.text();
+              const errText = await gatewayRes.text();
 
-              // Rate limit or overloaded — retry after delay
-              if ((anthropicRes.status === 429 || anthropicRes.status === 529) && retryCount < maxRetries) {
-                console.warn(`Anthropic ${anthropicRes.status}, retry ${retryCount + 1}/${maxRetries}`);
+              // Rate limit — retry after delay
+              if (gatewayRes.status === 429 && retryCount < maxRetries) {
+                console.warn(`Gateway 429, retry ${retryCount + 1}/${maxRetries}`);
                 retryCount++;
                 await new Promise((r) => setTimeout(r, 2000));
                 continue;
               }
 
-              // Context window too long — trim and retry once
-              if (anthropicRes.status === 400 && errText.toLowerCase().includes("context window") && retryCount === 0) {
-                console.warn("Context window exceeded, trimming to last 10 messages");
+              // Context too long — trim and retry once
+              if (gatewayRes.status === 400 && errText.toLowerCase().includes("context") && retryCount === 0) {
+                console.warn("Context too long, trimming to last 10 messages");
                 currentMessages = currentMessages.slice(-10);
                 retryCount++;
                 continue;
@@ -1355,18 +1308,20 @@ FILE CREATION:
 
               // Non-retryable error
               let userMessage = "Something went wrong. Please try again.";
-              if (anthropicRes.status === 429 || anthropicRes.status === 529) {
+              if (gatewayRes.status === 429) {
                 userMessage = "I'm handling a lot of requests right now. Please try again in a moment.";
-              } else if (anthropicRes.status === 400 && errText.toLowerCase().includes("context window")) {
+              } else if (gatewayRes.status === 402) {
+                userMessage = "AI usage credits have been exhausted. Please add more credits to continue.";
+              } else if (gatewayRes.status === 400 && errText.toLowerCase().includes("context")) {
                 userMessage = "This conversation is getting long. Starting a new chat may help.";
               }
-              console.error("Anthropic API error:", errText);
+              console.error("Gateway API error:", gatewayRes.status, errText);
               sendSSE(controller, "error", { message: userMessage });
               controller.close();
               return;
             }
 
-            if (!anthropicRes || !anthropicRes.ok) {
+            if (!gatewayRes || !gatewayRes.ok) {
               sendSSE(controller, "error", { message: "Something went wrong. Please try again." });
               controller.close();
               return;
@@ -1374,10 +1329,10 @@ FILE CREATION:
 
             // Collect tool calls and text from this stream iteration
             let iterationText = "";
-            const iterationToolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
+            const iterationToolCalls: OpenAIToolCall[] = [];
 
-            const streamResult = await parseAnthropicStream(
-              anthropicRes,
+            const streamResult = await parseOpenAIStream(
+              gatewayRes,
               controller,
               (text) => {
                 iterationText += text;
@@ -1388,46 +1343,32 @@ FILE CREATION:
               },
             );
 
-            const { stopReason, inputTokens, outputTokens } = streamResult;
-            totalTokens += inputTokens + outputTokens;
+            const { stopReason } = streamResult;
 
-            // Emit iteration progress to frontend
+            // Emit iteration progress
             const lastToolName = iterationToolCalls.length > 0 ? iterationToolCalls[iterationToolCalls.length - 1].name : undefined;
             sendSSE(controller, "iteration", { current: iterations, max: 5, tool: lastToolName });
 
-            // Cost guard
-            if (totalTokens > 30000) {
-              const costMsg = "\n\nI've completed what I could in this response. Want me to continue?";
-              fullText += costMsg;
-              sendSSE(controller, "text_delta", { text: costMsg });
-              break;
-            }
-
-            if (stopReason === "tool_use" && iterationToolCalls.length > 0) {
+            if (stopReason === "tool_calls" && iterationToolCalls.length > 0) {
               consecutiveEndTurns = 0;
-              // Build assistant content blocks for the conversation
-              const assistantContent: unknown[] = [];
-              if (iterationText) {
-                assistantContent.push({ type: "text", text: iterationText });
-              }
-              for (const tool of iterationToolCalls) {
-                assistantContent.push({
-                  type: "tool_use",
-                  id: tool.id,
-                  name: tool.name,
-                  input: tool.input,
-                });
-              }
 
-              currentMessages.push({ role: "assistant", content: assistantContent });
+              // Build assistant message with tool_calls for conversation history
+              const assistantMsg: any = {
+                role: "assistant",
+                content: iterationText || null,
+                tool_calls: iterationToolCalls.map(tc => ({
+                  id: tc.id,
+                  type: "function",
+                  function: { name: tc.name, arguments: JSON.stringify(tc.input) },
+                })),
+              };
+              currentMessages.push(assistantMsg);
 
-              // Execute tools — parallel when safe, sequential as fallback
-              const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
-              const customTools = iterationToolCalls.filter(t => t.name !== "web_search" && t.name !== "create_todos" && t.name !== "update_todo");
-              const webSearchTools = iterationToolCalls.filter(t => t.name === "web_search");
+              // Execute tools
+              const customTools = iterationToolCalls.filter(t => t.name !== "create_todos" && t.name !== "update_todo");
               const todoTools = iterationToolCalls.filter(t => t.name === "create_todos" || t.name === "update_todo");
 
-              // Handle todo tools immediately (no DB, just in-memory + SSE)
+              // Handle todo tools immediately
               for (const tool of todoTools) {
                 if (tool.name === "create_todos") {
                   const items = (tool.input.items as { content: string; active_form: string }[]) || [];
@@ -1441,20 +1382,16 @@ FILE CREATION:
                     sendSSE(controller, "todo_update", { todos: todos.map((t, i) => ({ ...t, index: i })) });
                   }
                 }
-                toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: JSON.stringify({ success: true }) });
+                // Push tool result message (OpenAI format)
+                currentMessages.push({ role: "tool", tool_call_id: tool.id, content: JSON.stringify({ success: true }) } as any);
               }
 
-              // Add web_search results immediately
-              for (const ws of webSearchTools) {
-                toolResults.push({ type: "tool_result", tool_use_id: ws.id, content: "Server-side tool — results already provided." });
-              }
-
-              // Send all tool_start events immediately for parallel UX
+              // Send all tool_start events
               for (const tool of customTools) {
                 const desc = TOOL_DESCRIPTIONS[tool.name] || "Working on it...";
                 const toolEntry: { tool: string; description: string; deal_id?: string; contact_id?: string } = { tool: tool.name, description: desc };
-                if (tool.input?.deal_id) toolEntry.deal_id = tool.input.deal_id;
-                if (tool.input?.contact_id) toolEntry.contact_id = tool.input.contact_id;
+                if (tool.input?.deal_id) toolEntry.deal_id = tool.input.deal_id as string;
+                if (tool.input?.contact_id) toolEntry.contact_id = tool.input.contact_id as string;
                 toolsUsed.push(toolEntry);
                 sendSSE(controller, "tool_start", { tool: tool.name, status: desc, input_summary: summarizeToolInput(tool.name, tool.input) });
               }
@@ -1470,7 +1407,6 @@ FILE CREATION:
 
                 sendSSE(controller, "tool_done", { tool: tool.name, result_summary: summarizeToolResult(tool.name, result, taskDescription), success: !(result as any)?.error });
 
-                // Stream file_created event for create_file tool
                 if (tool.name === "create_file" && result && typeof result === "object" && (result as any).url) {
                   sendSSE(controller, "file_created", {
                     filename: (result as any).filename,
@@ -1480,7 +1416,6 @@ FILE CREATION:
                   });
                 }
 
-                // Log to task_history (fire and forget)
                 adminClient.from("task_history").insert({
                   user_id: userId,
                   task_type: taskType,
@@ -1498,7 +1433,6 @@ FILE CREATION:
                 if (output.undoAction) undoActions.push(output.undoAction);
                 toolCallLog.push({ tool: output.tool.name, input: output.tool.input, result: output.result });
 
-                // Track entity IDs from tool results
                 const result = output.result;
                 if (result && typeof result === "object" && !Array.isArray(result)) {
                   const r = result as Record<string, unknown>;
@@ -1510,24 +1444,23 @@ FILE CREATION:
                   lastCreatedContactId = ((result as unknown[])[0] as Record<string, unknown>).id as string;
                 }
 
-                toolResults.push({
-                  type: "tool_result",
-                  tool_use_id: output.tool.id,
+                // Push tool result message (OpenAI format)
+                currentMessages.push({
+                  role: "tool",
+                  tool_call_id: output.tool.id,
                   content: JSON.stringify(output.result),
-                });
+                } as any);
               }
-
-              currentMessages.push({ role: "user", content: toolResults });
 
               // Smart early-exit: content generation tools with substantial text
               const CONTENT_TOOLS = ["draft_social_post", "draft_email", "draft_listing_description", "create_file"];
               const lastToolNames = iterationToolCalls.map(t => t.name);
               if (lastToolNames.some(t => CONTENT_TOOLS.includes(t)) && iterationText.trim().length > 50) {
-                break; // Content is ready
+                break;
               }
-              // Loop continues — will make another streaming call
+              // Loop continues
             } else {
-              // end_turn — check consecutive exits
+              // stop — check consecutive exits
               consecutiveEndTurns++;
               if (consecutiveEndTurns >= 2) break;
               break;
@@ -1544,7 +1477,6 @@ FILE CREATION:
           let contentType = "conversational";
           const toolNames = toolCallLog.map(t => t.tool);
 
-          // Guard: force conversational if response is too short for a card
           if (!fullText || fullText.trim().length < 20) {
             contentType = "conversational";
           } else if (toolNames.includes("create_deal") && toolNames.includes("enrich_property")) {
@@ -1558,7 +1490,7 @@ FILE CREATION:
             }
           }
 
-          // Save assistant message with enriched tool metadata
+          // Save assistant message
           const assistantContent = fullText || (toolCallLog.length > 0
             ? "I ran into an issue generating content. Could you try again or provide more details?"
             : "I wasn't able to generate a response. Please try again.");
@@ -1566,7 +1498,6 @@ FILE CREATION:
           if (undoActions.length > 0) metadata.undo_actions = undoActions;
           if (toolCallLog.length > 0) {
             metadata.tools = toolCallLog.map(t => {
-              // Create a concise result summary for history context
               let resultSummary = "";
               if (t.result && typeof t.result === "object" && !Array.isArray(t.result)) {
                 const r = t.result as Record<string, unknown>;
@@ -1591,41 +1522,31 @@ FILE CREATION:
             userClient.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation_id),
           ]);
 
-          // Auto-generate conversation title for first message (awaited so SSE arrives before close)
+          // Auto-generate conversation title for first message
           const isFirstMessage = history.length <= 1;
           if (isFirstMessage) {
             try {
               const summarySnippet = assistantContent.slice(0, 100);
-              const titleRes = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                headers: {
-                  "x-api-key": ANTHROPIC_API_KEY,
-                  "anthropic-version": "2023-06-01",
-                  "content-type": "application/json",
-                },
-                body: JSON.stringify({
-                  model: "claude-haiku-3-5-20241022",
-                  messages: [{
+              const newTitle = await gatewayCall(
+                LOVABLE_API_KEY,
+                [
+                  {
                     role: "user",
                     content: `Generate a short (3-6 word) conversation title for this exchange. Return only the title, no quotes or punctuation. User: ${message}. Assistant summary: ${summarySnippet}`,
-                  }],
-                  max_tokens: 20,
-                }),
-              });
-              if (titleRes.ok) {
-                const titleData = await titleRes.json();
-                const newTitle = (titleData.content?.[0]?.text || "").trim();
-                if (newTitle) {
-                  await adminClient.from("conversations").update({ title: newTitle }).eq("id", conversation_id);
-                  sendSSE(controller, "title_update", { title: newTitle });
-                }
+                  },
+                ],
+                20,
+              );
+              if (newTitle.trim()) {
+                await adminClient.from("conversations").update({ title: newTitle.trim() }).eq("id", conversation_id);
+                sendSSE(controller, "title_update", { title: newTitle.trim() });
               }
             } catch (err) {
               console.error("Title generation failed (non-blocking):", err);
             }
           }
 
-          // Build chip context from tool results
+          // Build chip context
           const chipContext: Record<string, unknown> = {};
           for (const t of toolCallLog) {
             if (t.tool === "get_active_deals" && Array.isArray(t.result)) {
@@ -1654,58 +1575,42 @@ FILE CREATION:
             }
           }
 
-          // Collect web search sources
-          const webSources = ((controller as any).__sources || []) as { title: string; url: string; domain: string }[];
-          // Deduplicate by URL
-          const uniqueSources = [...new Map(webSources.map((s: { title: string; url: string; domain: string }) => [s.url, s])).values()];
-
           // Send done event
-          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext, content_type: contentType, undo_actions: undoActions.length > 0 ? undoActions : undefined, sources: uniqueSources.length > 0 ? uniqueSources : undefined });
+          sendSSE(controller, "done", { tools_used: toolsUsed, last_deal_id: lastCreatedDealId, last_contact_id: lastCreatedContactId, chip_context: chipContext, content_type: contentType, undo_actions: undoActions.length > 0 ? undoActions : undefined });
 
-
-           // Background memory extraction (fire and forget)
-           const toolResults = toolCallLog.map(t => ({ tool: t.tool || t.name }));
-           const doExtract = shouldExtractMemoryCheck(assistantContent, toolResults);
-           const lastExtraction = lastExtractionMap.get(userId) || 0;
-           const cooldownOk = Date.now() - lastExtraction > 5 * 60 * 1000;
-           if (doExtract && cooldownOk) {
-             const lastMessages = [...history.slice(-3), { role: "user", content: message }, { role: "assistant", content: assistantContent }].slice(-4);
-             (async () => {
-               lastExtractionMap.set(userId, Date.now());
+          // Background memory extraction (fire and forget)
+          const toolResults = toolCallLog.map(t => ({ tool: t.tool || (t as any).name }));
+          const doExtract = shouldExtractMemoryCheck(assistantContent, toolResults);
+          const lastExtraction = lastExtractionMap.get(userId) || 0;
+          const cooldownOk = Date.now() - lastExtraction > 5 * 60 * 1000;
+          if (doExtract && cooldownOk) {
+            const lastMessages = [...history.slice(-3), { role: "user", content: message }, { role: "assistant", content: assistantContent }].slice(-4);
+            (async () => {
+              lastExtractionMap.set(userId, Date.now());
               try {
                 const excerpt = lastMessages.map((m) => `${m.role}: ${m.content}`).join("\n\n");
-                const memRes = await fetch("https://api.anthropic.com/v1/messages", {
-                  method: "POST",
-                  headers: {
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    model: "claude-haiku-3-5-20241022",
-                    system: "You extract important facts from conversations. Return ONLY a JSON array.",
-                    messages: [{
+                const rawText = await gatewayCall(
+                  LOVABLE_API_KEY,
+                  [
+                    { role: "system", content: "You extract important facts from conversations. Return ONLY a JSON array." },
+                    {
                       role: "user",
-                      content: `Extract important facts about this real estate agent's business, clients, deals, or preferences from the following conversation excerpt. Only extract facts worth remembering for future conversations. Return ONLY a valid JSON array of objects with 'fact' (string) and 'category' (string) fields. Categories: client_preference, deal_info, business_preference, vendor_info, personal, other. If nothing worth remembering, return [].\n\nConversation:\n${excerpt}`,
-                    }],
-                    max_tokens: 256,
-                  }),
-                });
+                      content: `Extract important facts about this real estate agent's business, clients, deals, or preferences from the following conversation excerpt. Only extract facts worth remembering for future conversations. Return ONLY a valid JSON array of objects with 'fact' (string) and 'category' (string) fields. Categories: client_preference, deal_info, business_preference, vendor_info, personal, other. If nothing worth remembering, return [].
 
-                if (!memRes.ok) {
-                  console.error("Memory extraction API error:", await memRes.text());
-                  return;
-                }
+Conversation:
+${excerpt}`,
+                    },
+                  ],
+                  256,
+                );
 
-                const memData = await memRes.json();
-                const rawText = memData.content?.[0]?.text || "[]";
+                if (!rawText) return;
                 const jsonMatch = rawText.match(/\[[\s\S]*\]/);
                 if (!jsonMatch) return;
 
                 const facts = JSON.parse(jsonMatch[0]);
                 if (!Array.isArray(facts) || facts.length === 0) return;
 
-                // Deduplicate against existing facts
                 const { data: existingFacts } = await adminClient
                   .from("memory_facts")
                   .select("fact")
@@ -1715,9 +1620,9 @@ FILE CREATION:
                 const rows = facts
                   .filter((f: { fact?: string; category?: string }) => f.fact && f.category)
                   .filter((f: { fact: string }) => {
-                     const lower = f.fact.toLowerCase();
-                     return !existingTexts.some((existing: string) => wordSimilarity(existing, lower) > 0.8);
-                   })
+                    const lower = f.fact.toLowerCase();
+                    return !existingTexts.some((existing: string) => wordSimilarity(existing, lower) > 0.8);
+                  })
                   .map((f: { fact: string; category: string }) => ({
                     user_id: userId,
                     fact: f.fact,
@@ -1738,7 +1643,7 @@ FILE CREATION:
         } catch (err) {
           console.error("Streaming error:", err);
           try {
-          const errMsg = (err as Error)?.message || 'Unknown error';
+            const errMsg = (err as Error)?.message || 'Unknown error';
             const userMessage = errMsg.includes("429") || errMsg.includes("rate")
               ? "I'm being rate limited right now. Please try again in a moment."
               : errMsg.includes("context") || errMsg.includes("token")
